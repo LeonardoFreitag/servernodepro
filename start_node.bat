@@ -1,0 +1,1 @@
+pm2 start c:\mettre\servernode\bin\server.js --name ServerNode

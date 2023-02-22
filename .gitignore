@@ -1,0 +1,4 @@
+/node_modules
+/tokens
+/services/firebaseConfig.js
+/src/config.js
