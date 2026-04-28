@@ -1,151 +1,90 @@
-'use strict';
+"use strict";
 
-const firebase = require("../services/firebaseConfig");
-
-const fb = firebase.firebase;
-
-exports.get = (req, res, next) => {
-  let data = req.body;
-  let code = 200;
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.del = del;
+exports.get = get;
+exports.post = post;
+exports.put = put;
+var _firebaseConfig = require("../services/firebaseConfig");
+const fb = _firebaseConfig.firebase;
+function get(req, res, next) {
+  const data = req.body;
   fb.auth().signInWithEmailAndPassword(data.email, data.password).then(() => {
-    let uid = fb.auth().currentUser.id;
-    resp = {
+    const uid = fb.auth().currentUser?.uid;
+    res.status(200).send({
       id: uid
-    };
-    code = 200;
+    });
   }).catch(erro => {
-    resp = {
+    res.status(400).send({
       id: erro.code
-    };
-    code = 400;
+    });
   });
-  res.status(code).send(resp);
-};
-
-exports.post = (req, res, next) => {
-  console.log('chamou a requisição');
-  let data = req.body;
-  let resp = {};
-  let code = 200; // console.log(data);
-
-  if (data.id == '0' || data.id == null) {
-    // registra provider
-    // cadastra na tavela de providers
-    // retorno o id
+}
+function post(req, res, next) {
+  const data = req.body;
+  const providerPayload = {
+    id: '',
+    name: data.name,
+    fantasy: data.fantasy,
+    cnpj: data.cnpj,
+    phone: data.phone,
+    cellphone: data.cellphone,
+    email: data.email,
+    password: data.password,
+    logo: data.logo,
+    feeDelivery: data.feeDelivery,
+    ray: data.ray,
+    feeDeliveryMode: data.feeDeliveryMode,
+    singleEdge: data.singleEdge
+  };
+  if (data.id === '0' || data.id == null) {
     fb.auth().createUserWithEmailAndPassword(data.email, data.password).then(() => {
-      let uid = fb.auth().currentUser.uid;
+      const uid = fb.auth().currentUser.uid;
       fb.firestore().collection('providers').doc(uid).set({
-        id: uid,
-        name: data.name,
-        fantasy: data.fantasy,
-        cnpj: data.cnpj,
-        phone: data.phone,
-        cellphone: data.cellphone,
-        email: data.email,
-        password: data.password,
-        logo: data.logo,
-        feeDelivery: data.feeDelivery,
-        ray: data.ray,
-        feeDeliveryMode: data.feeDeliveryMode,
-        singleEdge: data.singleEdge
-      }).then(() => {
-        console.log(uid);
-        resp = {
-          id: uid
-        };
-        code = 200;
-        res.status(code).send(resp);
-      }).catch(erro => {
-        code = 400;
+        ...providerPayload,
+        id: uid
+      }).then(() => res.status(200).send({
+        id: uid
+      })).catch(erro => {
+        res.status(400).send(erro.code);
         console.log(erro);
-        res.status(code).send(erro.code);
       });
     }).catch(erro => {
-      resp = {
-        id: null
-      };
-      code = 400;
+      res.status(400).send(erro.code);
       console.log(erro);
-      res.status(code).send(erro.code);
     });
   } else {
-    // faz o cadastro de login e na tabela providers
-    // console.log(data.email + '/' + data.password)
     fb.auth().signInWithEmailAndPassword(data.email, data.password).then(() => {
-      // let uid = fb.auth().currentUser.id;
-      // console.log(fb.auth().currentUser);
       fb.firestore().collection('providers').doc(data.id).set({
-        id: data.id,
-        name: data.name,
-        fantasy: data.fantasy,
-        cnpj: data.cnpj,
-        phone: data.phone,
-        cellphone: data.cellphone,
-        email: data.email,
-        password: data.password,
-        logo: data.logo,
-        feeDelivery: data.feeDelivery,
-        ray: data.ray,
-        feeDeliveryMode: data.feeDeliveryMode,
-        singleEdge: data.singleEdge
-      }).then(() => {
-        resp = {
-          id: data.id
-        };
-        code = 200;
-        res.status(code).send(resp);
-      }).catch(erro => {
-        code = 400;
+        ...providerPayload,
+        id: data.id
+      }).then(() => res.status(200).send({
+        id: data.id
+      })).catch(erro => {
+        res.status(400).send(erro);
         console.log(erro);
-        res.status(code).send(erro);
       });
     }).catch(erro => {
-      resp = {
-        id: null
-      };
-      code = 400;
+      res.status(400).send(erro);
       console.log(erro);
-      res.status(code).send(erro);
     });
   }
-};
-
-exports.put = (req, res, next) => {
-  let data = req.body;
-  let code = 0;
-  let resp = {}; // console.log(data);
-  // let user = fb.auth.currentUser;
-  // console.log(user);
-
+}
+function put(req, res, next) {
+  const data = req.body;
   fb.auth().signInWithEmailAndPassword(data.email, data.password).then(() => {
-    // console.log('fez o login');
-    // let uid = fb.auth().currentUser.id;
-    // console.log(fb.auth().currentUser);
     fb.firestore().collection('providers').doc(data.id).update({
       open: data.open
-    }).then(() => {
-      resp = {
-        id: data.id
-      };
-      code = 200;
-      console.log('tudo certo');
-      res.status(code).send(resp);
-    }).catch(erro => {
-      code = 400; // console.log(erro);
-
+    }).then(() => res.status(200).send({
+      id: data.id
+    })).catch(erro => {
+      res.status(400).send(erro);
       console.log(erro);
-      res.status(code).send(erro);
     });
-  }).catch(erro => {
-    resp = {
-      id: null
-    };
-    code = 400; // console.log(erro);
-
-    res.status(code).send(erro);
-  });
-};
-
-exports.delete = (req, res, next) => {
-  res.status(200).send(res);
-};
+  }).catch(erro => res.status(400).send(erro));
+}
+function del(req, res, next) {
+  res.status(200).send();
+}

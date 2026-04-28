@@ -1,52 +1,119 @@
 "use strict";
 
-const Firebird = require("node-firebird");
-
-const config = require("../config");
-
-var options = {};
-options.host = config.host;
-options.port = 3050;
-options.database = config.connectionString;
-options.user = "SYSDBA";
-options.password = "masterkey";
-options.lowercase_keys = false;
-options.role = null;
-options.pageSize = 4096;
-
-const getConjugaList = codMesa => {
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.del = del;
+exports.get = get;
+exports.post = post;
+exports.put = put;
+var _nodeFirebird = _interopRequireDefault(require("node-firebird"));
+var _firebird = _interopRequireDefault(require("../database/firebird"));
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+function getConjugaList(codMesa) {
   return new Promise((resolve, reject) => {
-    Firebird.attach(options, function (err, db) {
+    _nodeFirebird.default.attach(_firebird.default, (err, db) => {
       if (err) throw err;
-      db.query("select distinct(cod_conjuga) from mesas_itens where cod_mesas_abertas=? and cod_conjuga<>?", [codMesa, 0], function (err, result) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(result);
-        }
-
+      db.query('select distinct(cod_conjuga) from mesas_itens where cod_mesas_abertas=? and cod_conjuga<>?', [codMesa, 0], (err, result) => {
+        if (err) reject(err);else resolve(result);
         db.detach();
       });
     });
   });
-};
-
-exports.get = (req, res, next) => {
-  const codigo = req.params.codigo;
-  let dataResult = [];
+}
+function getCodConjuga() {
+  return new Promise((resolve, reject) => {
+    _nodeFirebird.default.attach(_firebird.default, (err, db) => {
+      if (err) throw err;
+      db.query('select gen_id(g_cod_conjuga_mesas, 1) as id from rdb$database', (err, result) => {
+        if (err) reject(err);else resolve(result[0].ID);
+        db.detach();
+      });
+    });
+  });
+}
+function getPrintGroupId() {
+  return new Promise((resolve, reject) => {
+    _nodeFirebird.default.attach(_firebird.default, (err, db) => {
+      if (err) throw err;
+      db.query('select gen_id(g_print_group, 1) as id from rdb$database', (err, result) => {
+        if (err) reject(err);else resolve(result[0].ID);
+        db.detach();
+      });
+    });
+  });
+}
+function insertImpressao(printGroupId, codMesa) {
+  return new Promise((resolve, reject) => {
+    _nodeFirebird.default.attach(_firebird.default, (err, db) => {
+      if (err) throw err;
+      db.query('insert into impressoes(id, id_computador, id_origem, origem) values(?, ?, ?, ?)', [printGroupId, 'MOBILE', codMesa, 'M'], (err, result) => {
+        if (err) reject(err);else resolve(result);
+        db.detach();
+      });
+    });
+  });
+}
+function insertItem(data, printGroupId) {
+  return new Promise((resolve, reject) => {
+    _nodeFirebird.default.attach(_firebird.default, (err, db) => {
+      if (err) throw err;
+      db.transaction(_nodeFirebird.default.ISOLATION_READ_COMMITED, (errt, transaction) => {
+        transaction.query('SELECT oretorno FROM POCKET_INSERT_PRODUTO(?, ?, ?, ?, ?, ?, ?, ?)', [data.codMesa, data.codProduto, data.qtde, data.obs, data.codAtendente, data.destino, data.mobileId, printGroupId], (errq, result) => {
+          if (errq) {
+            transaction.rollback();
+            return reject(errq);
+          }
+          transaction.commit(errf => {
+            if (errf) {
+              transaction.rollback();
+              return reject(errf);
+            }
+            db.detach();
+            resolve(result);
+          });
+        });
+      });
+    });
+  });
+}
+function insertItemCombined(data, printGroupId, codCombineMesa) {
+  return new Promise((resolve, reject) => {
+    _nodeFirebird.default.attach(_firebird.default, (err, db) => {
+      if (err) throw err;
+      db.transaction(_nodeFirebird.default.ISOLATION_READ_COMMITED, (errt, transaction) => {
+        transaction.query('SELECT oretorno FROM POCKET_INSERT_PRODUTO_COMBINE(?, ?, ?, ?, ?, ?, ?, ?, ?)', [data.codMesa, data.codProduto, data.qtde, data.obs, data.codAtendente, data.destino, data.mobileId, printGroupId, codCombineMesa], (errq, result) => {
+          if (errq) {
+            transaction.rollback();
+            return reject(errq);
+          }
+          transaction.commit(errf => {
+            if (errf) {
+              transaction.rollback();
+              return reject(errf);
+            }
+            db.detach();
+            resolve(result);
+          });
+        });
+      });
+    });
+  });
+}
+function get(req, res, next) {
+  const codigo = String(req.params.codigo);
+  const dataResult = [];
   getConjugaList(codigo).then(resp => {
-    Firebird.attach(options, function (err, db) {
-      if (err) throw err; // db = DATABASE
-
-      db.query("SELECT * FROM v_itens where codmesa=?", [codigo], function (err, result) {
-        // IMPORTANT: close the connection
+    _nodeFirebird.default.attach(_firebird.default, (err, db) => {
+      if (err) throw err;
+      db.query('SELECT * FROM v_itens where codmesa=?', [codigo], (err, result) => {
         resp.forEach(itemCodConjuga => {
           const conjugaFiltered = result.filter(opt => opt.COD_CONJUGA === itemCodConjuga.COD_CONJUGA);
           let totalFlavors = 0;
           const flavors = conjugaFiltered.map(flavor => {
-            totalFlavors = totalFlavors + flavor.TOTAL;
+            totalFlavors += flavor.TOTAL;
             return {
-              mobileId: "",
+              mobileId: '',
               codigo: flavor.CODIGO,
               comandaCodigo: flavor.CODMESA,
               fuincionarioCodigo: flavor.CODFUNC,
@@ -67,11 +134,11 @@ exports.get = (req, res, next) => {
           });
           const configItem = flavors[0];
           dataResult.push({
-            mobileId: "",
+            mobileId: '',
             codigo: configItem.codigo,
-            comandaCodigo: configItem.codMesa,
-            funcionarioCodigo: configItem.codFunc,
-            produtoCodigo: configItem.codProd,
+            comandaCodigo: configItem.comandaCodigo,
+            funcionarioCodigo: configItem.fuincionarioCodigo,
+            produtoCodigo: configItem.produtoCodigo,
             descricao: configItem.grupo,
             unidade: configItem.unidade,
             quantidade: 1,
@@ -81,16 +148,16 @@ exports.get = (req, res, next) => {
             grupo: configItem.grupo,
             subgrupo: configItem.subgrupo,
             impresso: configItem.impresso,
-            obs: "",
-            enviado: "S",
+            obs: '',
+            enviado: 'S',
             combinado: true,
-            codCombinado: configItem.cod_conjuga,
-            flavors: flavors
+            codCombinado: configItem.codCombinado,
+            flavors
           });
         });
         const dataSimple = result.filter(opt => opt.COD_CONJUGA === 0);
-        const dataSimpleLowerCase = dataSimple.map(item => {
-          return {
+        dataSimple.forEach(item => {
+          dataResult.push({
             codigo: item.CODIGO,
             comandaCodigo: item.CODMESA,
             funcionarioCodigo: item.CODFUNC,
@@ -105,352 +172,61 @@ exports.get = (req, res, next) => {
             subgrupo: item.SUBGRUPO,
             impresso: item.IMPRESSO,
             obs: item.OBS,
-            enviado: "S",
+            enviado: 'S',
             combinado: false,
             codCombinado: item.COD_CONJUGA,
             flavors: []
-          };
-        });
-        dataSimpleLowerCase.forEach(dataSimpleItem => {
-          dataResult.push(dataSimpleItem);
+          });
         });
         res.status(200).send(dataResult);
         db.detach();
       });
     });
   });
-};
-
-exports.post = (req, res, next) => {
+}
+function post(req, res, next) {
   res.status(201).send(req.body);
-};
-
-const getCodConjuga = () => {
-  return new Promise((resolve, reject) => {
-    Firebird.attach(options, function (err, db) {
-      if (err) throw err;
-      db.query("select gen_id(g_cod_conjuga_mesas, 1) as id from rdb$database", function (err, result) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(result[0].ID);
+}
+async function put(req, res) {
+  const printGroupId = await getPrintGroupId();
+  const dataItems = req.body;
+  const dataRetorno = [];
+  for (let i = 0; i < dataItems.length; ++i) {
+    const item = dataItems[i];
+    if (item.combinado) {
+      const codCombineMesa = await getCodConjuga();
+      for (const flavor of item.flavors) {
+        try {
+          const result = await insertItemCombined(flavor, printGroupId, codCombineMesa);
+          dataRetorno.push({
+            mobileId: flavor.mobileId,
+            retorno: result[0].ORETORNO
+          });
+        } catch (error) {
+          console.log(error);
+          res.status(400).send();
+          return;
         }
-
-        db.detach();
-      });
-    });
-  });
-};
-
-const getPrintGroupId = () => {
-  return new Promise((resolve, reject) => {
-    Firebird.attach(options, function (err, db) {
-      if (err) throw err;
-      db.query("select gen_id(g_print_group, 1) as id from rdb$database", function (err, result) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(result[0].ID);
-        }
-
-        db.detach();
-      });
-    });
-  });
-};
-
-const insertImpressao = (printGroupId, codMesa) => {
-  return new Promise((resolve, reject) => {
-    Firebird.attach(options, function (err, db) {
-      if (err) throw err;
-      db.query("insert into impressoes(id, id_computador, id_origem, origem) values(?, ?, ?, ?)", [printGroupId, "MOBILE", codMesa, "M"], function (err, result) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(result);
-        }
-
-        db.detach();
-      });
-    });
-  });
-};
-
-const insertItem = (data, printGroupId) => {
-  return new Promise((resolve, reject) => {
-    const codMesa = data.codMesa;
-    const codProduto = data.codProduto;
-    const qtde = data.qtde;
-    const obs = data.obs;
-    const atende = data.codAtendente;
-    const destino = data.destino;
-    const mobileId = data.mobileId;
-    const printGroup = printGroupId;
-    Firebird.attach(options, function (err1, db) {
-      if (err1) throw err1; // db = DATABASE
-
-      db.transaction(Firebird.ISOLATION_READ_COMMITED, function (errt, transaction) {
-        transaction.query("SELECT oretorno FROM POCKET_INSERT_PRODUTO(?, ?, ?, ?, ?, ?, ?, ?)", [codMesa, codProduto, qtde, obs, atende, destino, mobileId, printGroup], function (errq, result) {
-          if (errq) {
-            transaction.rollback();
-            reject(errq);
-            return;
-          }
-
-          transaction.commit(function (errf) {
-            if (errf) {
-              transaction.rollback();
-              reject(errf);
-            } else {
-              db.detach();
-              resolve(result);
-            }
-          });
-        });
-      });
-    });
-  });
-};
-
-const insertItemCombined = (data, printGroupId, codCombineMesa) => {
-  return new Promise((resolve, reject) => {
-    const codMesa = data.codMesa;
-    const codProduto = data.codProduto;
-    const qtde = data.qtde;
-    const obs = data.obs;
-    const atende = data.codAtendente;
-    const destino = data.destino;
-    const mobileId = data.mobileId;
-    const printGroup = printGroupId;
-    const codCombined = codCombineMesa;
-    Firebird.attach(options, function (err1, db) {
-      if (err1) throw err1; // db = DATABASE
-
-      db.transaction(Firebird.ISOLATION_READ_COMMITED, function (errt, transaction) {
-        transaction.query("SELECT oretorno FROM POCKET_INSERT_PRODUTO_COMBINE(?, ?, ?, ?, ?, ?, ?, ?, ?)", [codMesa, codProduto, qtde, obs, atende, destino, mobileId, printGroup, codCombined], function (errq, result) {
-          if (errq) {
-            transaction.rollback();
-            reject(errq);
-            return;
-          }
-
-          transaction.commit(function (errf) {
-            if (errf) {
-              transaction.rollback();
-              reject(errf);
-            } else {
-              db.detach();
-              resolve(result);
-            }
-          });
-        });
-      });
-    });
-  });
-};
-
-exports.put = (req, res) => {
-  getPrintGroupId().then(async printGroupId => {
-    const dataItems = req.body;
-    const dataListResp = [];
-    dataItems.forEach(async item => {
-      if (item.combinado) {
-        // return;
-        getCodConjuga().then(async codCombineMesa => {
-          item.flavors.forEach(async flavor => {
-            insertItemCombined(flavor, printGroupId, codCombineMesa).then(async result => {
-              const {
-                ORETORNO
-              } = result[0];
-
-              if (ORETORNO === 1) {
-                dataListResp.push({
-                  codMesa: flavor.codMesa,
-                  codProduto: flavor.codProduto,
-                  qtde: flavor.qtde,
-                  obs: flavor.obs,
-                  atende: flavor.codAtendente,
-                  destino: flavor.destino,
-                  impresso: "S",
-                  inserido: "S",
-                  mobileId: flavor.mobileId,
-                  printGroupId: printGroupId,
-                  combinado: flavor.combinado,
-                  flavors: flavor.flavors
-                });
-              }
-
-              if (ORETORNO === 0) {
-                dataListResp.push({
-                  codMesa: flavor.codMesa,
-                  codProduto: flavor.codProduto,
-                  qtde: flavor.qtde,
-                  obs: flavor.obs,
-                  atende: flavor.codAtendente,
-                  destino: flavor.destino,
-                  impresso: "N",
-                  inserido: "N",
-                  mobileId: flavor.mobileId,
-                  printGroupId: printGroupId,
-                  combinado: flavor.combinado,
-                  flavors: flavor.flavors
-                });
-              }
-
-              if (dataListResp.length === dataItems.length) {
-                insertImpressao(printGroupId, item.codMesa).then(() => {
-                  res.status(200).send(dataListResp);
-                });
-              }
-            }).catch(error => {
-              dataListResp.push({
-                codMesa: flavor.codMesa,
-                codProduto: flavor.codProduto,
-                qtde: flavor.qtde,
-                obs: flavor.obs,
-                atende: flavor.codAtendente,
-                destino: flavor.destino,
-                impresso: "N",
-                inserido: "N",
-                mobildId: flavor.mobileId,
-                printGroupId: printGroupId,
-                combinado: flavor.combinado,
-                flavors: flavor.flavors
-              });
-              res.status(400).send(dataListResp);
-            });
-          });
-        });
-      } else {
-        insertItem(item, printGroupId).then(result => {
-          const {
-            ORETORNO
-          } = result[0];
-
-          if (ORETORNO === 1) {
-            dataListResp.push({
-              codMesa: item.codMesa,
-              codProduto: item.codProduto,
-              qtde: item.qtde,
-              obs: item.obs,
-              atende: item.codAtendente,
-              destino: item.destino,
-              impresso: "S",
-              inserido: "S",
-              mobileId: item.mobileId,
-              printGroupId: printGroupId,
-              combinado: item.combinado,
-              flavors: item.flavors
-            });
-          }
-
-          if (ORETORNO === 0) {
-            dataListResp.push({
-              codMesa: item.codMesa,
-              codProduto: item.codProduto,
-              qtde: item.qtde,
-              obs: item.obs,
-              atende: item.codAtendente,
-              destino: item.destino,
-              impresso: "N",
-              inserido: "N",
-              mobileId: item.mobileId,
-              printGroupId: printGroupId,
-              combinado: item.combinado,
-              flavors: item.flavors
-            });
-          }
-
-          if (dataListResp.length === dataItems.length) {
-            insertImpressao(printGroupId, item.codMesa).then(() => {
-              res.status(200).send(dataListResp);
-            });
-          }
-        }).catch(error => {
-          dataListResp.push({
-            codMesa: item.codMesa,
-            codProduto: item.codProduto,
-            qtde: item.qtde,
-            obs: item.obs,
-            atende: item.codAtendente,
-            destino: item.destino,
-            impresso: "N",
-            inserido: "N",
-            mobildId: item.mobileId,
-            printGroupId: printGroupId,
-            combinado: item.combinado,
-            flavors: item.flavors
-          });
-          res.status(400).send(dataListResp);
-        });
       }
-    });
-  });
-};
-
-exports.insertItens = (req, res) => {
-  getPrintGroupId(printGroupId => {
-    const data = req.body.data;
-    data.array.forEach(item => {
-      let codMesa = item.codMesa;
-      let codProduto = item.codProduto;
-      let qtde = item.qtde;
-      let obs = item.obs;
-      let atende = item.codAtendente;
-      let codCombine = item.codCombine;
-      let destino = item.destino;
-
-      if (Number(codCombine) !== 0) {
-        Firebird.attach(options, function (err1, db) {
-          if (err1) throw err1; // db = DATABASE
-
-          db.transaction(Firebird.ISOLATION_READ_COMMITED, function (errt, transaction) {
-            transaction.query("SELECT oretorno FROM POCKET_INSERT_PRODUTO_COMBINE(?, ?, ?, ?, ?, ?, ?)", [codMesa, codProduto, qtde, obs, atende, codCombine, destino], function (errq, result) {
-              if (errq) {
-                transaction.rollback();
-                return;
-              }
-
-              transaction.commit(function (errf) {
-                if (errf) {
-                  transaction.rollback();
-                  res.status(400).send(err);
-                } else {
-                  db.detach();
-                  res.status(200).send(result);
-                }
-              });
-            });
-          });
+    } else {
+      try {
+        const result = await insertItem(item, printGroupId);
+        dataRetorno.push({
+          mobileId: item.mobileId,
+          retorno: result[0].ORETORNO
         });
-      } else {
-        Firebird.attach(options, function (err1, db) {
-          if (err1) throw err1; // db = DATABASE
-
-          db.transaction(Firebird.ISOLATION_READ_COMMITED, function (errt, transaction) {
-            transaction.query("SELECT oretorno FROM POCKET_INSERT_PRODUTO_COMBINE(?, ?, ?, ?, ?, ?, ?)", [codMesa, codProduto, qtde, obs, atende, codCombine, destino], function (errq, result) {
-              if (errq) {
-                transaction.rollback();
-                return;
-              }
-
-              transaction.commit(function (errf) {
-                if (errf) {
-                  transaction.rollback();
-                  res.status(400).send(err);
-                } else {
-                  db.detach();
-                  res.status(200).send(result);
-                }
-              });
-            });
-          });
-        });
+      } catch (error) {
+        console.log(error);
+        res.status(400).send();
+        return;
       }
-    });
-  });
-};
-
-exports.delete = (req, res, next) => {
+    }
+    if (i === dataItems.length - 1) {
+      await insertImpressao(printGroupId, item.codMesa);
+      res.status(200).send();
+    }
+  }
+}
+function del(req, res, next) {
   res.status(200).send(req.body);
-};
+}

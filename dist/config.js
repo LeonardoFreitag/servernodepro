@@ -1,17 +1,13 @@
 "use strict";
 
-const {
-  pathToFileURL
-} = require("url");
-
-require("path");
-
-module.exports = {
-  // connectionString: '/home/leonardo/Firebird/dados.fdb',
-  // host: 'localhost',C:\Projetos\Mettre\Update\BotecoDeEsquina
-  // host: "192.168.18.6",
-  host: "172.16.50.104",
-  connectionString: "C:/Projetos/Mettre/Dados/DADOS.FDB",
-  port: "3000",
-  venonBot: true
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+const config = {
+  host: '192.168.18.103',
+  connectionString: 'C:/Projetos/Mettre/Dados/DADOS.FDB',
+  port: '3000',
+  venonBot: false
 };
+var _default = exports.default = config;

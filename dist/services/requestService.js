@@ -1,45 +1,34 @@
 "use strict";
 
-const Firebird = require("node-firebird");
-
-const config = require("../config");
-
-const rm = require("../utils/removeEmoji");
-
-var options = {};
-options.host = config.host;
-options.port = 3050;
-options.database = config.connectionString;
-options.user = "SYSDBA";
-options.password = "masterkey";
-options.lowercase_keys = false;
-options.role = null;
-options.pageSize = 4096;
-
-const firebase = require("../services/firebaseConfig");
-
-const fb = firebase.firebase;
-
-const date = require("date-and-time");
-
-exports.getNewRequests = idProvider => {
-  fb.firestore().collection("requests").where("idProvider", "==", idProvider).where("read", "==", false).get().then(result => {
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.getNewRequests = getNewRequests;
+var _nodeFirebird = _interopRequireDefault(require("node-firebird"));
+var _firebird = _interopRequireDefault(require("../database/firebird"));
+var _firebaseConfig = require("./firebaseConfig");
+var rm = _interopRequireWildcard(require("../utils/removeEmoji"));
+var _dateAndTime = _interopRequireDefault(require("date-and-time"));
+function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]); return f; })(e, t); }
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+const fb = _firebaseConfig.firebase;
+function getNewRequests(idProvider) {
+  fb.firestore().collection('requests').where('idProvider', '==', idProvider).where('read', '==', false).get().then(result => {
     result.forEach(item => {
       handleSave(item);
     });
   }).catch(erro => {
     console.log(erro);
   });
-};
-
-const handleSave = function (req) {
-  saveRequest(req, function (idRequest) {
-    let items = req.data().items;
+}
+function handleSave(req) {
+  saveRequest(req, idRequest => {
+    const items = req.data().items;
     items.forEach(prod => {
-      if (prod.combined === "S") {
+      if (prod.combined === 'S') {
         const codeCombined = Math.floor(Math.random() * (100000 - 1) + 1);
         prod.flavors.forEach(flavor => {
-          let f = {
+          const f = {
             id: codeCombined,
             idRequest: flavor.idRequest,
             code: flavor.code,
@@ -52,68 +41,50 @@ const handleSave = function (req) {
             conjuga: codeCombined,
             idEntrega: idRequest
           };
-          saveFlavors(f, idRequest, function (ok) {
-            console.log("insert flavor " + ok);
+          saveFlavors(f, idRequest, ok => {
+            console.log('insert flavor ' + ok);
           });
         });
       } else {
-        saveItems(prod, idRequest, function (ok) {
-          console.log("insert item " + ok);
+        saveItems(prod, idRequest, ok => {
+          console.log('insert item ' + ok);
         });
       }
     });
   });
-};
-
-const saveRequest = (request, callback) => {
-  console.log(request.data());
-  let data = request.data();
-  let comeGet = "";
-
-  if (data.comeGet) {
-    comeGet = "S";
-  } else {
-    comeGet = "N";
-  }
-
-  let newDate = date.format(new Date(data.dateRequest), "DD/MM/YYYY").toString(); // d_streetname, d_streetnumber, d_neighborhood, d_complement,
-  // d_latitude, d_longitude, d_zipcode, d_city, d_state
-
-  Firebird.attach(options, function (err, db) {
+}
+function saveRequest(request, callback) {
+  const data = request.data();
+  const comeGet = data.comeGet ? 'S' : 'N';
+  const newDate = _dateAndTime.default.format(new Date(data.dateRequest), 'DD/MM/YYYY').toString();
+  _nodeFirebird.default.attach(_firebird.default, (err, db) => {
     if (err) throw err;
-    db.query("SELECT oretorno FROM WEB_ENTREGA(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [data.id, data.idCustomer, data.idProvider, newDate, data.totalProducts, data.feeDelivery, data.totalRequest, data.status, rm.remove(data.address), rm.remove(data.dataCustomer.number), data.neigh, data.idNeigh, rm.remove(data.complement), data.formPayment, data.dataCustomer.whats, rm.remove(data.dataCustomer.name), rm.remove(data.comments), comeGet, data.change, rm.remove(data.dataCustomer.address), rm.remove(data.dataCustomer.number), data.dataCustomer.neigh, rm.remove(data.dataCustomer.complement), data.dataCustomer.latitude, data.dataCustomer.longitude, rm.remove(data.dataCustomer.zipcode), rm.remove(data.dataCustomer.city), data.dataCustomer.state], function (err, result) {
+    db.query('SELECT oretorno FROM WEB_ENTREGA(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [data.id, data.idCustomer, data.idProvider, newDate, data.totalProducts, data.feeDelivery, data.totalRequest, data.status, rm.remove(data.address), rm.remove(data.dataCustomer.number), data.neigh, data.idNeigh, rm.remove(data.complement), data.formPayment, data.dataCustomer.whats, rm.remove(data.dataCustomer.name), rm.remove(data.comments), comeGet, data.change, rm.remove(data.dataCustomer.address), rm.remove(data.dataCustomer.number), data.dataCustomer.neigh, rm.remove(data.dataCustomer.complement), data.dataCustomer.latitude, data.dataCustomer.longitude, rm.remove(data.dataCustomer.zipcode), rm.remove(data.dataCustomer.city), data.dataCustomer.state], (err, result) => {
       if (err) {
-        console.log("save request " + err);
+        console.log('save request ' + err);
       } else {
         callback(result[0].ORETORNO);
-        fb.firestore().collection("requests").doc(data.id).update({
+        fb.firestore().collection('requests').doc(data.id).update({
           read: true
         });
       }
-
       db.detach();
     });
   });
-};
-
-const saveFlavors = (request, idRequest, callback) => {
-  let flavor = request; // console.log('Insert flavor ' + flavor.description);
-  // console.log(flavor);
-
-  Firebird.attach(options, function (err1, db) {
-    if (err1) throw err1; // db = DATABASE
-
-    db.transaction(Firebird.ISOLATION_READ_COMMITED, function (errt, transaction) {
-      db.query("SELECT oretorno FROM WEB_ITEMS_COMBINED(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [flavor.id, flavor.idRequest, flavor.code, flavor.description, flavor.unity, flavor.amount, flavor.price, flavor.total, rm.remove(flavor.comments), flavor.idEntrega, flavor.conjuga], function (errq, result) {
+}
+function saveFlavors(flavor, idRequest, callback) {
+  _nodeFirebird.default.attach(_firebird.default, (err, db) => {
+    if (err) throw err;
+    db.transaction(_nodeFirebird.default.ISOLATION_READ_COMMITED, (errt, transaction) => {
+      db.query('SELECT oretorno FROM WEB_ITEMS_COMBINED(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [flavor.id, flavor.idRequest, flavor.code, flavor.description, flavor.unity, flavor.amount, flavor.price, flavor.total, rm.remove(flavor.comments), flavor.idEntrega, flavor.conjuga], (errq, result) => {
         if (errq) {
           transaction.rollback();
-          callback("0");
+          return callback('0');
         }
-
-        transaction.commit(function (errf) {
+        transaction.commit(errf => {
           if (errf) {
             transaction.rollback();
-            callback("0");
+            callback('0');
           } else {
             db.detach();
             callback(result[0].ORETORNO);
@@ -122,38 +93,23 @@ const saveFlavors = (request, idRequest, callback) => {
       });
     });
   });
-};
-
-const saveItems = (request, idRequest, callback) => {
-  let data = request;
-  let dataId = data.id;
-  let dataIdRequest = data.idRequest;
-  let dataCode = data.code;
-  let dataDescription = data.description;
-  let dataUnity = data.unity;
-  let dataAmount = parseFloat(data.amount);
-  let dataPrice = parseFloat(data.price);
-  let dataTotal = parseFloat(data.total);
-  let dataComments = data.comments; // console.log("Insert item " + data.description);
-
-  Firebird.attach(options, function (err1, db) {
-    if (err1) throw err1; // db = DATABASE
-
-    db.transaction(Firebird.ISOLATION_READ_COMMITED, function (errt, transaction) {
-      transaction.query("SELECT oretorno FROM WEB_ITEMS(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [dataId, dataIdRequest, dataCode, dataDescription, dataUnity, dataAmount, dataPrice, dataTotal, rm.remove(dataComments), idRequest], function (errq, result) {
+}
+function saveItems(item, idRequest, callback) {
+  _nodeFirebird.default.attach(_firebird.default, (err, db) => {
+    if (err) throw err;
+    db.transaction(_nodeFirebird.default.ISOLATION_READ_COMMITED, (errt, transaction) => {
+      transaction.query('SELECT oretorno FROM WEB_ITEMS(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [item.id, item.idRequest, item.code, item.description, item.unity, parseFloat(String(item.amount)), parseFloat(String(item.price)), parseFloat(String(item.total)), rm.remove(item.comments), idRequest], (errq, result) => {
         if (errq) {
-          transaction.rollback(); // console.log("save itens " + errq);
-
-          callback("0");
+          transaction.rollback();
+          return callback('0');
         }
-
-        transaction.commit(function (errf) {
+        transaction.commit(errf => {
           if (errf) {
             console.log(errf);
             transaction.rollback();
-            callback("0");
+            callback('0');
           } else {
-            console.log("retorno do firebird");
+            console.log('retorno do firebird');
             callback(result[0].ORETORNO);
           }
         });
@@ -161,4 +117,4 @@ const saveItems = (request, idRequest, callback) => {
       });
     });
   });
-};
+}

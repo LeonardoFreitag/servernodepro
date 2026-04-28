@@ -11,7 +11,6 @@ exports.up = function (knex) {
     table.decimal('price').noteNullable();
   });
 };
-
 exports.down = function (knex) {
   return knex.schema.dropTable('products');
 };

@@ -1,81 +1,52 @@
-'use strict';
+"use strict";
 
-const firebase = require("../services/firebaseConfig");
-
-const fb = firebase.firebase;
-
-exports.get = (req, res, next) => {};
-
-exports.post = (req, res, next) => {
-  let data = req.body; // console.log(data);
-
-  let id = '';
-
-  if (data.id == '' || data.id == null) {
-    let ref = fb.firestore().collection('products').doc();
-    id = ref.id;
-  } else {
-    id = data.id;
-  }
-
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.del = del;
+exports.get = get;
+exports.post = post;
+exports.put = put;
+var _firebaseConfig = require("../services/firebaseConfig");
+const fb = _firebaseConfig.firebase;
+function get(req, res, next) {
+  res.status(200).send([]);
+}
+async function post(req, res, next) {
+  const data = req.body;
+  const id = data.id || fb.firestore().collection('neighborhood').doc().id;
   let user = fb.auth().currentUser;
-
+  const payload = {
+    idProvider: data.idProvider,
+    id,
+    code: data.code,
+    name: data.name,
+    feeDelivery: data.feeDelivery,
+    city: data.city,
+    uf: data.uf,
+    ibge: data.ibge,
+    active: data.active
+  };
+  const save = () => fb.firestore().collection('neighborhood').doc(id).set(payload).then(() => res.status(201).send({
+    id
+  })).catch(erro => {
+    res.status(400).send(erro);
+    console.log(erro);
+  });
   if (user == null) {
-    fb.auth().signInWithEmailAndPassword(data.email, data.password).then(async () => {
-      user = fb.auth().currentUser;
-      fb.firestore().collection('neighborhood').doc(id).set({
-        idProvider: data.idProvider,
-        id: id,
-        code: data.code,
-        name: data.name,
-        feeDelivery: data.feeDelivery,
-        city: data.city,
-        uf: data.uf,
-        ibge: data.ibge,
-        active: data.active
-      }).then(() => {
-        let r = {
-          id: id
-        };
-        res.status(201).send(r);
-      }).catch(erro => {
-        res.status(400).send(erro);
-        console.log(erro);
-      });
-    });
+    await fb.auth().signInWithEmailAndPassword(data.email, data.password);
+    save();
   } else {
-    fb.firestore().collection('neighborhood').doc(id).set({
-      idProvider: data.idProvider,
-      id: id,
-      code: data.code,
-      name: data.name,
-      feeDelivery: data.feeDelivery,
-      city: data.city,
-      uf: data.uf,
-      ibge: data.ibge,
-      active: data.active
-    }).then(() => {
-      let r = {
-        id: id
-      };
-      res.status(201).send(r);
-    }).catch(erro => {
-      res.status(400).send(erro);
-      console.log(erro);
-    });
+    save();
   }
-};
-
-exports.put = (req, res, next) => {
-  const id = req.params.id;
-  let result = {
-    id: id,
+}
+function put(req, res, next) {
+  res.status(201).send({
+    id: req.params.id,
     title: req.body.title,
     cost: req.body.cost
-  };
-  res.status(201).send(result);
-};
-
-exports.delete = (req, res, next) => {
+  });
+}
+function del(req, res, next) {
   res.status(200).send(req.body);
-};
+}

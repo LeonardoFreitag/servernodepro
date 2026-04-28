@@ -1,45 +1,35 @@
-'use strict';
+"use strict";
 
-const Firebird = require("node-firebird");
-
-const config = require("../config");
-
-var options = {};
-options.host = config.host;
-options.port = 3050;
-options.database = config.connectionString;
-options.user = 'SYSDBA';
-options.password = 'masterkey';
-options.lowercase_keys = false;
-options.role = null;
-options.pageSize = 4096;
-
-exports.get = (req, res, next) => {
-  Firebird.attach(options, function (err, db) {
-    if (err) throw err; // db = DATABASE
-
-    db.query('SELECT V_LIMITE_PEDACOS FROM config', function (err, result) {
-      // IMPORTANT: close the connection
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.del = del;
+exports.get = get;
+exports.post = post;
+exports.put = put;
+var _nodeFirebird = _interopRequireDefault(require("node-firebird"));
+var _firebird = _interopRequireDefault(require("../database/firebird"));
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+function get(req, res, next) {
+  _nodeFirebird.default.attach(_firebird.default, (err, db) => {
+    if (err) throw err;
+    db.query('SELECT V_LIMITE_PEDACOS FROM config', (err, result) => {
       res.status(200).send(result);
       db.detach();
     });
   });
-};
-
-exports.post = (req, res, next) => {
+}
+function post(req, res, next) {
   res.status(201).send(req.body);
-};
-
-exports.put = (req, res, next) => {
+}
+function put(req, res, next) {
   const id = req.params.id;
-  let result = {
-    id: id,
+  res.status(201).send({
+    id,
     title: req.body.title,
     cost: req.body.cost
-  };
-  res.status(201).send(result);
-};
-
-exports.delete = (req, res, next) => {
+  });
+}
+function del(req, res, next) {
   res.status(200).send(req.body);
-};
+}

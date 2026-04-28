@@ -2,3 +2,5 @@
 /tokens
 /services/firebaseConfig.js
 /src/config.js
+.env
+src/config.ts

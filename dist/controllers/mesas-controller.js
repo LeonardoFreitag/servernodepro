@@ -1,143 +1,104 @@
 "use strict";
 
-const Firebird = require("node-firebird");
-
-const config = require("../config");
-
-var options = {};
-options.host = config.host;
-options.port = 3050;
-options.database = config.connectionString;
-options.user = "SYSDBA";
-options.password = "masterkey";
-options.lowercase_keys = false;
-options.role = null;
-options.pageSize = 4096;
-
-exports.get = (req, res, next) => {
-  Firebird.attach(options, function (err, db) {
-    if (err) throw err; // db = DATABASE
-
-    db.query("SELECT * FROM v_mesas", function (err, result) {
-      // IMPORTANT: close the connection
-      const dataResult = result.map(item => {
-        return {
-          codigo: item.CODIGO,
-          comanda: item.MESA,
-          subtotal: item.SUBTOTAL,
-          total: item.TOTAL,
-          status: item.STATUS,
-          ordem: item.ORDEM
-        };
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.del = del;
+exports.fechaConta = fechaConta;
+exports.get = get;
+exports.insereComanda = insereComanda;
+exports.post = post;
+var _nodeFirebird = _interopRequireDefault(require("node-firebird"));
+var _firebird = _interopRequireDefault(require("../database/firebird"));
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+function getPrintCaixaGroupId() {
+  return new Promise((resolve, reject) => {
+    _nodeFirebird.default.attach(_firebird.default, (err, db) => {
+      if (err) throw err;
+      db.query('select gen_id(g_print_group_caixa, 1) as id from rdb$database', (err, result) => {
+        if (err) reject(err);else resolve(result[0].ID);
+        db.detach();
       });
+    });
+  });
+}
+function insertImpressaoCaixa(printGroupId, codMesa, destino) {
+  return new Promise((resolve, reject) => {
+    _nodeFirebird.default.attach(_firebird.default, (err, db) => {
+      if (err) throw err;
+      db.query('insert into impressoes_caixa(id, id_computador, id_origem, origem, destino) values(?, ?, ?, ?, ?)', [printGroupId, 'MOBILE', codMesa, 'M', destino], (err, result) => {
+        if (err) reject(err);else resolve(result);
+        db.detach();
+      });
+    });
+  });
+}
+function updateStatusConta(codigo) {
+  return new Promise((resolve, reject) => {
+    _nodeFirebird.default.attach(_firebird.default, (err, db) => {
+      if (err) throw err;
+      db.query("update mesas_abertas set status=? where codigo=?", ['F', codigo], err => {
+        if (err) reject(false);else resolve(true);
+        db.detach();
+      });
+    });
+  });
+}
+function get(req, res, next) {
+  _nodeFirebird.default.attach(_firebird.default, (err, db) => {
+    if (err) throw err;
+    db.query('SELECT * FROM v_mesas', (err, result) => {
+      const dataResult = result.map(item => ({
+        codigo: item.CODIGO,
+        comanda: item.MESA,
+        subtotal: item.SUBTOTAL,
+        total: item.TOTAL,
+        status: item.STATUS,
+        ordem: item.ORDEM
+      }));
       res.status(200).send(dataResult);
       db.detach();
     });
   });
-};
-
-exports.post = (req, res, next) => {
+}
+function post(req, res, next) {
   res.status(201).send(req.body);
-};
-
-exports.insereComanda = (req, res, next) => {
-  let mesa = req.body.mesa;
-  let destino = req.body.destino;
-  let intMesa = Number(mesa);
-  let mesaChanged = String(intMesa);
-  let atende = req.body.codAtendente;
-  Firebird.attach(options, function (err, db) {
-    if (err) throw err; // db = DATABASE
-
-    db.query("SELECT oretorno FROM POCKET_INSERT_MESA(?, ?, ?)", [atende, mesaChanged, destino], function (err, result) {
-      // IMPORTANT: close the connection
+}
+function insereComanda(req, res, next) {
+  const mesa = req.body.mesa;
+  const mesaDestino = req.body.mesaDestino;
+  const mesaChanged = String(Number(mesa));
+  const atende = req.body.codAtendente;
+  _nodeFirebird.default.attach(_firebird.default, (err, db) => {
+    if (err) throw err;
+    db.query('SELECT oretorno FROM POCKET_INSERT_MESA(?, ?, ?)', [atende, mesaChanged, mesaDestino], (err, result) => {
       if (err) {
         res.status(400).send(err);
+        return;
       }
-
-      const dataResult = result.map(item => {
-        return {
-          oretorno: item.ORETORNO
-        };
-      });
+      const dataResult = result.map(item => ({
+        oretorno: item.ORETORNO
+      }));
       res.status(200).send(dataResult);
       db.detach();
     });
   });
-};
-
-exports.delete = (req, res, next) => {
+}
+function del(req, res, next) {
   res.status(200).send(req.body);
-};
-
-const getPrintCaixaGroupId = () => {
-  return new Promise((resolve, reject) => {
-    Firebird.attach(options, function (err, db) {
-      if (err) throw err;
-      db.query("select gen_id(g_print_group_caixa, 1) as id from rdb$database", function (err, result) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(result[0].ID);
-        }
-
-        db.detach();
-      });
-    });
+}
+async function fechaConta(req, res) {
+  const printGroupId = await getPrintCaixaGroupId();
+  let fechouConta = false;
+  const {
+    codigo,
+    destino
+  } = req.body;
+  if (destino === 'F') {
+    fechouConta = await updateStatusConta(codigo);
+  }
+  await insertImpressaoCaixa(printGroupId, codigo, destino);
+  res.status(200).send({
+    fechouConta
   });
-};
-
-const insertImpressaoCaixa = (printGroupId, codMesa, destino) => {
-  return new Promise((resolve, reject) => {
-    Firebird.attach(options, function (err, db) {
-      if (err) throw err;
-      db.query("insert into impressoes_caixa(id, id_computador, id_origem, origem, destino) values(?, ?, ?, ?, ?)", [printGroupId, "MOBILE", codMesa, "M", destino], function (err, result) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(result);
-        }
-
-        db.detach();
-      });
-    });
-  });
-};
-
-const updateStatusConta = codigo => {
-  return new Promise((resolve, reject) => {
-    Firebird.attach(options, function (err, db) {
-      if (err) throw err;
-      db.query("update mesas_abertas set status=? where codigo=?", ["F", codigo], function (err, result) {
-        if (err) {
-          reject(false);
-        } else {
-          resolve(true);
-        }
-
-        db.detach();
-      });
-    });
-  });
-};
-
-exports.fechaConta = (req, res) => {
-  getPrintCaixaGroupId().then(async printGroupId => {
-    let fechouConta = false;
-    const {
-      codigo,
-      destino
-    } = req.body;
-
-    if (destino === "F") {
-      fechouConta = await updateStatusConta(codigo);
-    }
-
-    const dataResult = {
-      fechouConta: fechouConta
-    };
-    insertImpressaoCaixa(printGroupId, codigo, destino).then(() => {
-      res.status(200).send(dataResult);
-    });
-  });
-};
+}
