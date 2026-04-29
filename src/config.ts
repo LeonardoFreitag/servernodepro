@@ -10,6 +10,8 @@ interface Config {
   twilioToken: string;
   twilioWhatsappFrom: string;
   frontendUrl: string;
+  firebaseEmail: string;
+  firebasePassword: string;
 }
 
 const config: Config = {
@@ -22,6 +24,8 @@ const config: Config = {
   twilioToken: process.env.TWILIO_TOKEN || '',
   twilioWhatsappFrom: process.env.TWILIO_WHATSAPP_FROM || '',
   frontendUrl: process.env.FRONTEND_URL || '',
+  firebaseEmail: process.env.FIREBASE_EMAIL || '',
+  firebasePassword: process.env.FIREBASE_PASSWORD || '',
 };
 
 export default config;

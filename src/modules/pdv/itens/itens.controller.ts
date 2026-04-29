@@ -51,62 +51,78 @@ function getPrintGroupId(): Promise<any> {
   });
 }
 
-function insertImpressao(printGroupId: any, codMesa: string): Promise<any> {
+function queryInTransaction(transaction: any, sql: string, params: any[]): Promise<any[]> {
   return new Promise((resolve, reject) => {
-    Firebird.attach(firebirdOptions, (err, db) => {
-      if (err) throw err;
-      db.query(
-        'insert into impressoes(id, id_computador, id_origem, origem) values(?, ?, ?, ?)',
-        [printGroupId, 'MOBILE', codMesa, 'M'],
-        (err, result) => {
-          if (err) reject(err);
-          else resolve(result);
-          db.detach();
-        }
-      );
+    transaction.query(sql, params, (err: any, result: any) => {
+      if (err) reject(err);
+      else resolve(result);
     });
   });
 }
 
-function insertItem(data: any, printGroupId: any): Promise<any> {
+// Insere todos os itens e o registro de impressão em uma única transação atômica.
+// O monitor Delphi só enxerga a entrada em `impressoes` após todos os itens
+// estarem commitados, eliminando a race condition.
+async function insertAllItemsAtomically(
+  dataItems: any[],
+  printGroupId: any,
+  combinadoCodes: Map<number, any>
+): Promise<any[]> {
   return new Promise((resolve, reject) => {
     Firebird.attach(firebirdOptions, (err, db) => {
-      if (err) throw err;
-      db.transaction(Firebird.ISOLATION_READ_COMMITED, (errt, transaction) => {
-        transaction.query(
-          'SELECT oretorno FROM POCKET_INSERT_PRODUTO(?, ?, ?, ?, ?, ?, ?, ?)',
-          [data.codMesa, data.codProduto, data.qtde, data.obs, data.codAtendente, data.destino, data.mobileId, printGroupId],
-          (errq, result) => {
-            if (errq) { transaction.rollback(); return reject(errq); }
-            transaction.commit((errf) => {
-              if (errf) { transaction.rollback(); return reject(errf); }
-              db.detach();
-              resolve(result);
-            });
-          }
-        );
-      });
-    });
-  });
-}
+      if (err) return reject(err);
 
-function insertItemCombined(data: any, printGroupId: any, codCombineMesa: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    Firebird.attach(firebirdOptions, (err, db) => {
-      if (err) throw err;
       db.transaction(Firebird.ISOLATION_READ_COMMITED, (errt, transaction) => {
-        transaction.query(
-          'SELECT oretorno FROM POCKET_INSERT_PRODUTO_COMBINE(?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [data.codMesa, data.codProduto, data.qtde, data.obs, data.codAtendente, data.destino, data.mobileId, printGroupId, codCombineMesa],
-          (errq, result) => {
-            if (errq) { transaction.rollback(); return reject(errq); }
-            transaction.commit((errf) => {
-              if (errf) { transaction.rollback(); return reject(errf); }
-              db.detach();
-              resolve(result);
-            });
+        if (errt) { db.detach(); return reject(errt); }
+
+        const execute = async () => {
+          const dataRetorno: any[] = [];
+          let combinadoIndex = 0;
+
+          for (const item of dataItems) {
+            if (item.combinado) {
+              const codCombineMesa = combinadoCodes.get(combinadoIndex++);
+              for (const flavor of item.flavors) {
+                const result = await queryInTransaction(
+                  transaction,
+                  'SELECT oretorno FROM POCKET_INSERT_PRODUTO_COMBINE(?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                  [flavor.codMesa, flavor.codProduto, flavor.qtde, flavor.obs, flavor.codAtendente, flavor.destino, flavor.mobileId, printGroupId, codCombineMesa]
+                );
+                dataRetorno.push({ mobileId: flavor.mobileId, retorno: result[0].ORETORNO });
+              }
+            } else {
+              const result = await queryInTransaction(
+                transaction,
+                'SELECT oretorno FROM POCKET_INSERT_PRODUTO(?, ?, ?, ?, ?, ?, ?, ?)',
+                [item.codMesa, item.codProduto, item.qtde, item.obs, item.codAtendente, item.destino, item.mobileId, printGroupId]
+              );
+              dataRetorno.push({ mobileId: item.mobileId, retorno: result[0].ORETORNO });
+            }
           }
-        );
+
+          const codMesa = dataItems[0].codMesa;
+          await queryInTransaction(
+            transaction,
+            'insert into impressoes(id, id_computador, id_origem, origem) values(?, ?, ?, ?)',
+            [printGroupId, 'MOBILE', codMesa, 'M']
+          );
+
+          return dataRetorno;
+        };
+
+        execute()
+          .then((dataRetorno) => {
+            transaction.commit((errf) => {
+              if (errf) { transaction.rollback(); db.detach(); return reject(errf); }
+              db.detach();
+              resolve(dataRetorno);
+            });
+          })
+          .catch((error) => {
+            transaction.rollback();
+            db.detach();
+            reject(error);
+          });
       });
     });
   });
@@ -210,37 +226,23 @@ export function post(req: Request, res: Response, next: NextFunction): void {
 export async function put(req: Request, res: Response): Promise<void> {
   const printGroupId = await getPrintGroupId();
   const dataItems: any[] = req.body;
-  const dataRetorno: any[] = [];
 
-  for (let i = 0; i < dataItems.length; ++i) {
-    const item = dataItems[i];
+  // Gera os códigos de conjuga antes da transação principal (generators são
+  // independentes de transação no Firebird, não precisam estar no mesmo contexto)
+  const combinadoCodes = new Map<number, any>();
+  let combinadoIndex = 0;
+  for (const item of dataItems) {
     if (item.combinado) {
-      const codCombineMesa = await getCodConjuga();
-      for (const flavor of item.flavors) {
-        try {
-          const result = await insertItemCombined(flavor, printGroupId, codCombineMesa);
-          dataRetorno.push({ mobileId: flavor.mobileId, retorno: result[0].ORETORNO });
-        } catch (error) {
-          console.log(error);
-          res.status(400).send();
-          return;
-        }
-      }
-    } else {
-      try {
-        const result = await insertItem(item, printGroupId);
-        dataRetorno.push({ mobileId: item.mobileId, retorno: result[0].ORETORNO });
-      } catch (error) {
-        console.log(error);
-        res.status(400).send();
-        return;
-      }
+      combinadoCodes.set(combinadoIndex++, await getCodConjuga());
     }
+  }
 
-    if (i === dataItems.length - 1) {
-      await insertImpressao(printGroupId, item.codMesa);
-      res.status(200).send();
-    }
+  try {
+    await insertAllItemsAtomically(dataItems, printGroupId, combinadoCodes);
+    res.status(200).send();
+  } catch (error) {
+    console.log(error);
+    res.status(400).send();
   }
 }
 

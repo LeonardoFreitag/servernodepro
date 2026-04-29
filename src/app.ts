@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
 import bodyParser from 'body-parser';
 import path from 'path';
 
@@ -19,9 +20,11 @@ import neighborhoodRoutes from './modules/digital/neighborhood/neighborhood.rout
 import paymentRoutes from './modules/digital/payment/payment.routes';
 import requestsRoutes from './modules/digital/requests/requests.routes';
 import entregasRoutes from './modules/digital/entregas/entregas.routes';
+import deliveryRoutes from './modules/digital/delivery/delivery.routes';
 
 const app = express();
 
+app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'images')));
@@ -47,5 +50,6 @@ app.use('/neighborhood', neighborhoodRoutes);
 app.use('/payment', paymentRoutes);
 app.use('/request', requestsRoutes);
 app.use('/entregas', entregasRoutes);
+app.use('/delivery', deliveryRoutes);
 
 export default app;
