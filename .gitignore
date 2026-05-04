@@ -4,3 +4,4 @@
 /src/config.js
 .env
 src/config.ts
+serviceAccountKey.json

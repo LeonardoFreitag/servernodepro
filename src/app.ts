@@ -21,6 +21,7 @@ import paymentRoutes from './modules/digital/payment/payment.routes';
 import requestsRoutes from './modules/digital/requests/requests.routes';
 import entregasRoutes from './modules/digital/entregas/entregas.routes';
 import deliveryRoutes from './modules/digital/delivery/delivery.routes';
+import restauranteRoutes from './modules/digital/restaurante/restaurante.routes';
 
 const app = express();
 
@@ -51,5 +52,6 @@ app.use('/payment', paymentRoutes);
 app.use('/request', requestsRoutes);
 app.use('/entregas', entregasRoutes);
 app.use('/delivery', deliveryRoutes);
+app.use('/restaurante', restauranteRoutes);
 
 export default app;
