@@ -94,13 +94,23 @@ async function insertAllItemsAtomically(
               const result = await queryInTransaction(
                 transaction,
                 'SELECT oretorno FROM POCKET_INSERT_PRODUTO(?, ?, ?, ?, ?, ?, ?, ?)',
-                [item.codMesa, item.codProduto, item.qtde, item.obs, item.codAtendente, item.destino, item.mobileId, printGroupId]
+                [
+                  item.codMesa        ?? item.comandaCodigo,
+                  item.codProduto     ?? item.produtoCodigo,
+                  item.qtde           ?? item.quantidade,
+                  item.obs,
+                  item.codAtendente   ?? item.funcionarioCodigo,
+                  item.destino,
+                  item.mobileId,
+                  printGroupId,
+                ]
               );
               dataRetorno.push({ mobileId: item.mobileId, retorno: result[0].ORETORNO });
             }
           }
 
-          const codMesa = dataItems[0].codMesa;
+          const firstItem = dataItems[0];
+          const codMesa = firstItem.codMesa ?? firstItem.comandaCodigo ?? firstItem.flavors?.[0]?.codMesa;
           await queryInTransaction(
             transaction,
             'insert into impressoes(id, id_computador, id_origem, origem) values(?, ?, ?, ?)',
@@ -238,8 +248,8 @@ export async function put(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    await insertAllItemsAtomically(dataItems, printGroupId, combinadoCodes);
-    res.status(200).send();
+    const retorno = await insertAllItemsAtomically(dataItems, printGroupId, combinadoCodes);
+    res.status(200).send(retorno);
   } catch (error) {
     console.log(error);
     res.status(400).send();
