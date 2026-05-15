@@ -2,10 +2,10 @@ import config from '../../config';
 
 const firebirdOptions = {
   host: config.host,
-  port: 3050,
+  port: config.firebirdPort,
   database: config.connectionString,
-  user: 'SYSDBA',
-  password: 'masterkey',
+  user: config.firebirdUser,
+  password: config.firebirdPassword,
   lowercase_keys: false,
   role: null as string | null,
   pageSize: 4096,

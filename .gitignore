@@ -3,5 +3,5 @@
 /services/firebaseConfig.js
 /src/config.js
 .env
-src/config.ts
+.DS_Store
 serviceAccountKey.json
