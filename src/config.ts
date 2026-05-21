@@ -1,7 +1,7 @@
 import path from 'path';
 import dotenv from 'dotenv';
 
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 interface Config {
   host: string;
@@ -21,7 +21,7 @@ interface Config {
 }
 
 const config: Config = {
-  host: process.env.HOST || '',
+  host: process.env.FIREBIRD_HOST || '',  
   connectionString: process.env.CONNECTION_STRING || '',
   port: process.env.PORT || '3000',
   firebirdPort: Number(process.env.FIREBIRD_PORT) || 3050,
