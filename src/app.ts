@@ -11,6 +11,8 @@ import subgruposRoutes from './modules/pdv/subgrupos/subgrupos.routes';
 import obsRoutes from './modules/pdv/obs/obs.routes';
 import mesasRoutes from './modules/pdv/mesas/mesas.routes';
 import itensRoutes from './modules/pdv/itens/itens.routes';
+import cieloRoutes from './modules/pdv/cielo/cielo.routes';
+import nfceRoutes from './modules/pdv/nfce/nfce.routes';
 
 // Digital
 import cardapioRoutes from './modules/digital/cardapio/cardapio.routes';
@@ -42,6 +44,8 @@ app.use('/subgrupos', subgruposRoutes);
 app.use('/obs', obsRoutes);
 app.use('/mesas', mesasRoutes);
 app.use('/itens', itensRoutes);
+app.use('/cielo', cieloRoutes);
+app.use('/nfce', nfceRoutes);
 
 // Digital
 app.use('/products', cardapioRoutes);

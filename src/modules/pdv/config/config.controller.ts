@@ -7,7 +7,12 @@ export function get(req: Request, res: Response, next: NextFunction): void {
     if (err) throw err;
 
     db.query('SELECT V_LIMITE_PEDACOS FROM config', (err, result) => {
-      res.status(200).send(result);
+      const row = result?.[0] ?? {};
+      res.status(200).send({
+        vLimitePedacos: row.V_LIMITE_PEDACOS ?? null,
+        cieloClientId: process.env.CIELO_CLIENT_ID ?? '',
+        cieloAccessToken: process.env.CIELO_ACCESS_TOKEN ?? '',
+      });
       db.detach();
     });
   });
