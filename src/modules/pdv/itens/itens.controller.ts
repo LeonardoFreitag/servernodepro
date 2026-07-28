@@ -147,6 +147,8 @@ export function get(req: Request, res: Response, next: NextFunction): void {
       if (err) throw err;
 
       db.query('SELECT * FROM v_itens where codmesa=?', [codigo], (err, result) => {
+        let totalServico = 0;
+
         resp.forEach((itemCodConjuga: any) => {
           const conjugaFiltered = result.filter(
             (opt: any) => opt.COD_CONJUGA === itemCodConjuga.COD_CONJUGA
@@ -154,6 +156,7 @@ export function get(req: Request, res: Response, next: NextFunction): void {
           let totalFlavors = 0;
           const flavors = conjugaFiltered.map((flavor: any) => {
             totalFlavors += flavor.TOTAL;
+            totalServico  += Number(flavor.SERVICO ?? 0);
             return {
               mobileId: '',
               codigo: flavor.CODIGO,
@@ -200,6 +203,7 @@ export function get(req: Request, res: Response, next: NextFunction): void {
 
         const dataSimple = result.filter((opt: any) => opt.COD_CONJUGA === 0);
         dataSimple.forEach((item: any) => {
+          totalServico += Number(item.SERVICO ?? 0);
           dataResult.push({
             codigo: item.CODIGO,
             comandaCodigo: item.CODMESA,
@@ -221,6 +225,31 @@ export function get(req: Request, res: Response, next: NextFunction): void {
             flavors: [],
           });
         });
+
+        // Injeta taxa de serviço como item sintético (somente leitura no app)
+        if (totalServico > 0) {
+          dataResult.push({
+            mobileId:         'taxa-servico',
+            codigo:           0,
+            comandaCodigo:    Number(codigo),
+            funcionarioCodigo: 0,
+            produtoCodigo:    'SERVICO',
+            descricao:        'Taxa de serviço',
+            unidade:          'UN',
+            quantidade:       1,
+            unitario:         totalServico,
+            total:            totalServico,
+            hora:             '',
+            grupo:            'SERVIÇO',
+            subgrupo:         '',
+            impresso:         'S',
+            obs:              '',
+            enviado:          'S',
+            combinado:        false,
+            codCombinado:     0,
+            flavors:          [],
+          });
+        }
 
         res.status(200).send(dataResult);
         db.detach();
