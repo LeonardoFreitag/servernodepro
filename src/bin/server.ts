@@ -4,6 +4,7 @@ import debug from 'debug';
 import config from '../config';
 import * as requests from '../modules/digital/requests/requests.service';
 import * as providers from '../modules/digital/providers/providers.service';
+import { startWatchdog } from '../modules/digital/providers/heartbeat.service';
 
 const log = debug('nodestr:server');
 
@@ -22,6 +23,8 @@ providers.getProviderId((result: string) => {
 setInterval(() => {
   requests.getNewRequests(idProvider);
 }, 15000);
+
+startWatchdog();
 
 server.listen(port);
 server.on('error', onError);

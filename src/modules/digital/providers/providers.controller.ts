@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { firebase } from '../../../shared/firebase/firebase.config';
+import { onManualClose } from './heartbeat.service';
 
 const fb = firebase;
 
@@ -50,7 +51,12 @@ export function put(req: Request, res: Response, next: NextFunction): void {
   fb.auth().signInWithEmailAndPassword(data.email, data.password)
     .then(() => {
       fb.firestore().collection('providers').doc(data.id).update({ open: data.open })
-        .then(() => res.status(200).send({ id: data.id }))
+        .then(() => {
+          if (data.open === 'N') {
+            onManualClose(data.id);
+          }
+          res.status(200).send({ id: data.id });
+        })
         .catch((erro: any) => { res.status(400).send(erro); console.log(erro); });
     })
     .catch((erro: any) => res.status(400).send(erro));

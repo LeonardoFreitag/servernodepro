@@ -13,7 +13,8 @@
     "forceConsistentCasingInFileNames": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "noEmit": true
+    "noEmit": true,
+    "types": ["node", "jest"]
   },
   "include": ["src/**/*", "knexfile.ts"],
   "exclude": ["node_modules", "dist"]

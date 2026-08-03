@@ -3,6 +3,23 @@ import Firebird from 'node-firebird';
 import { admin, db } from '../../../shared/firebase/firebase-admin.config';
 import firebirdOptions from '../../../shared/database/firebird';
 
+export function abrirRestauranteInterno(idProvider: string, link?: string): Promise<FirebaseFirestore.WriteResult> {
+  return db.collection('restauranteAtivo').doc(idProvider).set({
+    restaurante: 'ServerNode',
+    idProvider,
+    link,
+    ativo: true,
+    atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+export function fecharRestauranteInterno(idProvider: string): Promise<FirebaseFirestore.WriteResult> {
+  return db.collection('restauranteAtivo').doc(idProvider).update({
+    ativo: false,
+    atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
 export function abrirRestaurante(req: Request, res: Response): void {
   Firebird.attach(firebirdOptions, (err, fbDb) => {
     if (err) {
@@ -27,13 +44,7 @@ export function abrirRestaurante(req: Request, res: Response): void {
       try {
         const idProvider = row.WEB_KEY ?? row.web_key;
 
-        await db.collection('restauranteAtivo').doc(idProvider).set({
-          restaurante: 'ServerNode',
-          idProvider,
-          link: row.WEB_URL_WHATS ?? row.web_url_whats,
-          ativo: true,
-          atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
-        });
+        await abrirRestauranteInterno(idProvider, row.WEB_URL_WHATS ?? row.web_url_whats);
 
         res.status(200).send({ sucesso: true, restaurante: 'ServerNode' });
       } catch (fsErr: any) {
@@ -67,10 +78,7 @@ export function fecharRestaurante(req: Request, res: Response): void {
       try {
         const idProvider = row.WEB_KEY ?? row.web_key;
 
-        await db.collection('restauranteAtivo').doc(idProvider).update({
-          ativo: false,
-          atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
-        });
+        await fecharRestauranteInterno(idProvider);
 
         res.status(200).send({ sucesso: true, restaurante: 'ServerNode' });
       } catch (fsErr: any) {
