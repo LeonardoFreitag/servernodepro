@@ -147,16 +147,15 @@ export function get(req: Request, res: Response, next: NextFunction): void {
       if (err) throw err;
 
       db.query('SELECT * FROM v_itens where codmesa=?', [codigo], (err, result) => {
-        let totalServico = 0;
-
         resp.forEach((itemCodConjuga: any) => {
           const conjugaFiltered = result.filter(
             (opt: any) => opt.COD_CONJUGA === itemCodConjuga.COD_CONJUGA
           );
           let totalFlavors = 0;
+          let servicoFlavors = 0;
           const flavors = conjugaFiltered.map((flavor: any) => {
-            totalFlavors += flavor.TOTAL;
-            totalServico  += Number(flavor.SERVICO ?? 0);
+            totalFlavors  += flavor.TOTAL;
+            servicoFlavors += Number(flavor.SERVICO ?? 0);
             return {
               mobileId: '',
               codigo: flavor.CODIGO,
@@ -168,6 +167,7 @@ export function get(req: Request, res: Response, next: NextFunction): void {
               quantidade: flavor.QUANTIDADE,
               unitario: flavor.UNITARIO,
               total: flavor.TOTAL,
+              servico: Number(flavor.SERVICO ?? 0),
               hora: flavor.HORA,
               grupo: flavor.GRUPO,
               subgrupo: flavor.SUBGRUPO,
@@ -189,6 +189,7 @@ export function get(req: Request, res: Response, next: NextFunction): void {
             quantidade: 1,
             unitario: configItem.unitario,
             total: totalFlavors,
+            servico: servicoFlavors,
             hora: configItem.hora,
             grupo: configItem.grupo,
             subgrupo: configItem.subgrupo,
@@ -203,53 +204,28 @@ export function get(req: Request, res: Response, next: NextFunction): void {
 
         const dataSimple = result.filter((opt: any) => opt.COD_CONJUGA === 0);
         dataSimple.forEach((item: any) => {
-          totalServico += Number(item.SERVICO ?? 0);
           dataResult.push({
-            codigo: item.CODIGO,
-            comandaCodigo: item.CODMESA,
+            codigo:           item.CODIGO,
+            comandaCodigo:    item.CODMESA,
             funcionarioCodigo: item.CODFUNC,
-            produtoCodigo: item.CODPROD,
-            descricao: item.DESCRICAO,
-            unidade: item.UNIDADE,
-            quantidade: item.QUANTIDADE,
-            unitario: item.UNITARIO,
-            total: item.TOTAL,
-            hora: item.HORA,
-            grupo: item.GRUPO,
-            subgrupo: item.SUBGRUPO,
-            impresso: item.IMPRESSO,
-            obs: item.OBS,
-            enviado: 'S',
-            combinado: false,
-            codCombinado: item.COD_CONJUGA,
-            flavors: [],
-          });
-        });
-
-        // Injeta taxa de serviço como item sintético (somente leitura no app)
-        if (totalServico > 0) {
-          dataResult.push({
-            mobileId:         'taxa-servico',
-            codigo:           0,
-            comandaCodigo:    Number(codigo),
-            funcionarioCodigo: 0,
-            produtoCodigo:    'SERVICO',
-            descricao:        'Taxa de serviço',
-            unidade:          'UN',
-            quantidade:       1,
-            unitario:         totalServico,
-            total:            totalServico,
-            hora:             '',
-            grupo:            'SERVIÇO',
-            subgrupo:         '',
-            impresso:         'S',
-            obs:              '',
+            produtoCodigo:    item.CODPROD,
+            descricao:        item.DESCRICAO,
+            unidade:          item.UNIDADE,
+            quantidade:       item.QUANTIDADE,
+            unitario:         item.UNITARIO,
+            total:            item.TOTAL,
+            servico:          Number(item.SERVICO ?? 0),
+            hora:             item.HORA,
+            grupo:            item.GRUPO,
+            subgrupo:         item.SUBGRUPO,
+            impresso:         item.IMPRESSO,
+            obs:              item.OBS,
             enviado:          'S',
             combinado:        false,
-            codCombinado:     0,
+            codCombinado:     item.COD_CONJUGA,
             flavors:          [],
           });
-        }
+        });
 
         res.status(200).send(dataResult);
         db.detach();

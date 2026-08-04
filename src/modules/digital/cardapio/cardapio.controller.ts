@@ -18,14 +18,15 @@ export function getEstoque(req: Request, res: Response, next: NextFunction): voi
 
     db.query('SELECT * FROM v_estoque', (err, result) => {
       const dataResult = result.map((item: any) => ({
-        codigo: item.CODIGO,
-        nome: item.NOME,
-        unidade: item.UNIDADE,
-        preco: item.PRECO,
-        grupo: item.GRUPO,
-        subgrupo: item.SUBGRUPO,
-        fracionado: item.FRACIONADO,
-        impressao: item.IMPRESSO,
+        codigo:        item.CODIGO,
+        nome:          item.NOME,
+        unidade:       item.UNIDADE,
+        preco:         item.PRECO,
+        grupo:         item.GRUPO,
+        subgrupo:      item.SUBGRUPO,
+        fracionado:    item.FRACIONADO,
+        impressao:     item.IMPRESSO,
+        cobrarServico: (item.COBRAR_SERVICO ?? 'N').toString().trim(),
       }));
       res.status(200).send(dataResult);
       db.detach();
