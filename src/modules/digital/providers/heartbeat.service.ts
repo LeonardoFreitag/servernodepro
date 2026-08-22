@@ -1,5 +1,6 @@
 import * as providersService from './providers.service';
 import { abrirRestauranteInterno, fecharRestauranteInterno } from '../restaurante/restaurante.controller';
+import { registrarEventoRestaurante } from '../../../shared/utils/restauranteEventos';
 import * as state from './heartbeat.state';
 
 export const HEARTBEAT_TIMEOUT_MS = 90_000;
@@ -39,14 +40,16 @@ async function openProviderByHeartbeat(id: string): Promise<void> {
   }
 
   await abrirRestauranteInterno(id, link);
-  console.log(`[heartbeat] heartbeat-open: ${id}`);
+  console.log(`[heartbeat] ${new Date().toISOString()} heartbeat-open: ${id}`);
+  registrarEventoRestaurante(id, 'abertura', 'heartbeat');
 }
 
 async function closeProviderByWatchdog(id: string): Promise<void> {
   await providersService.setProviderOpenFlag(id, 'N');
   await fecharRestauranteInterno(id);
   state.markClosedByWatchdog(id);
-  console.log(`[watchdog] watchdog-close: ${id}`);
+  console.log(`[watchdog] ${new Date().toISOString()} watchdog-close: ${id}`);
+  registrarEventoRestaurante(id, 'fechamento', 'watchdog');
 }
 
 export async function runWatchdogTick(now: number = Date.now()): Promise<void> {

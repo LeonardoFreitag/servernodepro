@@ -31,6 +31,7 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'images')));
+app.use(express.static(path.join(__dirname, 'views')));
 
 app.get('/', (req: Request, res: Response) => {
   res.status(200).send({ title: 'Mettre API', version: '0.0.2' });

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import Firebird from 'node-firebird';
 import { admin, db } from '../../../shared/firebase/firebase-admin.config';
 import firebirdOptions from '../../../shared/database/firebird';
+import { listarEventosRestaurante, registrarEventoRestaurante } from '../../../shared/utils/restauranteEventos';
 
 export function abrirRestauranteInterno(idProvider: string, link?: string): Promise<FirebaseFirestore.WriteResult> {
   return db.collection('restauranteAtivo').doc(idProvider).set({
@@ -45,6 +46,8 @@ export function abrirRestaurante(req: Request, res: Response): void {
         const idProvider = row.WEB_KEY ?? row.web_key;
 
         await abrirRestauranteInterno(idProvider, row.WEB_URL_WHATS ?? row.web_url_whats);
+        console.log(`[restaurante] ${new Date().toISOString()} abrir-manual: ${idProvider}`);
+        registrarEventoRestaurante(idProvider, 'abertura', 'manual');
 
         res.status(200).send({ sucesso: true, restaurante: 'ServerNode' });
       } catch (fsErr: any) {
@@ -79,6 +82,8 @@ export function fecharRestaurante(req: Request, res: Response): void {
         const idProvider = row.WEB_KEY ?? row.web_key;
 
         await fecharRestauranteInterno(idProvider);
+        console.log(`[restaurante] ${new Date().toISOString()} fechar-manual: ${idProvider}`);
+        registrarEventoRestaurante(idProvider, 'fechamento', 'manual');
 
         res.status(200).send({ sucesso: true, restaurante: 'ServerNode' });
       } catch (fsErr: any) {
@@ -86,4 +91,9 @@ export function fecharRestaurante(req: Request, res: Response): void {
       }
     });
   });
+}
+
+export function listarEventos(req: Request, res: Response): void {
+  const limit = Number(req.query.limit) || 200;
+  res.status(200).send(listarEventosRestaurante(limit));
 }
