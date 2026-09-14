@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { firebase } from '../../../shared/firebase/firebase.config';
 import { onManualClose } from './heartbeat.service';
+import { invalidateStatusCache } from './status.cache';
+import { toIsoOffset } from '../../../shared/utils/datetime';
 
 const fb = firebase;
 
@@ -50,8 +52,13 @@ export function put(req: Request, res: Response, next: NextFunction): void {
   const data = req.body;
   fb.auth().signInWithEmailAndPassword(data.email, data.password)
     .then(() => {
-      fb.firestore().collection('providers').doc(data.id).update({ open: data.open })
+      fb.firestore().collection('providers').doc(data.id).update({
+        open: data.open,
+        openSource: 'manual',
+        openChangedAt: toIsoOffset(),
+      })
         .then(() => {
+          invalidateStatusCache(data.id);
           if (data.open === 'N') {
             onManualClose(data.id);
           }

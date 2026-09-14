@@ -26,11 +26,13 @@ export async function handleHeartbeat(id: string): Promise<HeartbeatResult> {
     await openProviderByHeartbeat(id);
   }
 
+  // Estado após o processamento do heartbeat: se chegou até aqui a loja está aberta
+  // (ou já estava, ou acabou de ser reaberta). O PDV lê este campo como fonte de estado.
   return { status: 'ok', open: true };
 }
 
 async function openProviderByHeartbeat(id: string): Promise<void> {
-  await providersService.setProviderOpenFlag(id, 'S');
+  await providersService.setProviderOpenFlag(id, 'S', 'heartbeat');
 
   let link: string | undefined;
   try {
@@ -45,7 +47,7 @@ async function openProviderByHeartbeat(id: string): Promise<void> {
 }
 
 async function closeProviderByWatchdog(id: string): Promise<void> {
-  await providersService.setProviderOpenFlag(id, 'N');
+  await providersService.setProviderOpenFlag(id, 'N', 'watchdog');
   await fecharRestauranteInterno(id);
   state.markClosedByWatchdog(id);
   console.log(`[watchdog] ${new Date().toISOString()} watchdog-close: ${id}`);

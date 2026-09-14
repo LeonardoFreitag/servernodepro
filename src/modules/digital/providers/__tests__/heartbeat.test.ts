@@ -56,7 +56,7 @@ describe('handleHeartbeat', () => {
     const result = await handleHeartbeat(PROVIDER_ID);
 
     expect(result).toEqual({ status: 'ok', open: true });
-    expect(providersServiceMock.setProviderOpenFlag).toHaveBeenCalledWith(PROVIDER_ID, 'S');
+    expect(providersServiceMock.setProviderOpenFlag).toHaveBeenCalledWith(PROVIDER_ID, 'S', 'heartbeat');
     expect(restauranteControllerMock.abrirRestauranteInterno).toHaveBeenCalledTimes(1);
   });
 
@@ -90,7 +90,7 @@ describe('runWatchdogTick', () => {
 
     await runWatchdogTick(start + HEARTBEAT_TIMEOUT_MS + 1000);
 
-    expect(providersServiceMock.setProviderOpenFlag).toHaveBeenCalledWith(PROVIDER_ID, 'N');
+    expect(providersServiceMock.setProviderOpenFlag).toHaveBeenCalledWith(PROVIDER_ID, 'N', 'watchdog');
     expect(restauranteControllerMock.fecharRestauranteInterno).toHaveBeenCalledWith(PROVIDER_ID);
 
     (Date.now as jest.Mock).mockRestore();

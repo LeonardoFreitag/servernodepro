@@ -1,6 +1,10 @@
 import Firebird from 'node-firebird';
 import firebirdOptions from '../../../shared/database/firebird';
 import { db } from '../../../shared/firebase/firebase-admin.config';
+import { invalidateStatusCache } from './status.cache';
+import { toIsoOffset } from '../../../shared/utils/datetime';
+
+export type ProviderOpenSource = 'manual' | 'heartbeat' | 'watchdog' | 'panel' | (string & {});
 
 export function getProviderId(callback: (id: string) => void): void {
   Firebird.attach(firebirdOptions, (err, db) => {
@@ -54,6 +58,30 @@ export function getProviderSnapshot(id: string): Promise<FirebaseFirestore.Docum
   return db.collection('providers').doc(id).get();
 }
 
-export function setProviderOpenFlag(id: string, open: 'S' | 'N'): Promise<FirebaseFirestore.WriteResult> {
-  return db.collection('providers').doc(id).update({ open });
+/**
+ * Grava o estado de abertura do provider.
+ *
+ * `source` é opcional e apenas carimba quem definiu o estado (consumido por
+ * GET /providers/status). O contrato HTTP das rotas existentes não muda.
+ */
+export function setProviderOpenFlag(
+  id: string,
+  open: 'S' | 'N',
+  source?: ProviderOpenSource,
+): Promise<FirebaseFirestore.WriteResult> {
+  const payload: Record<string, unknown> = { open };
+
+  if (source) {
+    payload.openSource = source;
+    payload.openChangedAt = toIsoOffset();
+  }
+
+  // Invalida antes e depois: antes evita servir estado velho durante a escrita,
+  // depois cobre leituras que tenham repovoado o cache no meio do caminho.
+  invalidateStatusCache(id);
+
+  return db.collection('providers').doc(id).update(payload).then((result) => {
+    invalidateStatusCache(id);
+    return result;
+  });
 }
