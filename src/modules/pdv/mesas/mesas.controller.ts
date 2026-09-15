@@ -98,15 +98,28 @@ export function del(req: Request, res: Response, next: NextFunction): void {
   res.status(200).send(req.body);
 }
 
+/**
+ * POST /mesas/fechaConta
+ *
+ * Body: { codigo, destino, imprimir? }
+ *   - destino 'F' fecha a conta (mesas_abertas.status = 'F'); 'C' apenas conferência.
+ *   - imprimir (default true): quando false, NÃO gera linha em impressoes_caixa
+ *     (apenas atualiza o status). Opcional — o fluxo Cielo do app fecha a conta
+ *     uma única vez, ao receber o total, COM impressão, para avisar o caixa de
+ *     que pode proceder o recebimento e a emissão da NFC-e.
+ */
 export async function fechaConta(req: Request, res: Response): Promise<void> {
-  const printGroupId = await getPrintCaixaGroupId();
   let fechouConta = false;
-  const { codigo, destino } = req.body;
+  const { codigo, destino, imprimir = true } = req.body;
 
   if (destino === 'F') {
     fechouConta = await updateStatusConta(codigo);
   }
 
-  await insertImpressaoCaixa(printGroupId, codigo, destino);
+  if (imprimir !== false) {
+    const printGroupId = await getPrintCaixaGroupId();
+    await insertImpressaoCaixa(printGroupId, codigo, destino);
+  }
+
   res.status(200).send({ fechouConta });
 }

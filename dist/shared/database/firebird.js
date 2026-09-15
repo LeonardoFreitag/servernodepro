@@ -8,10 +8,10 @@ var _config = _interopRequireDefault(require("../../config"));
 function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 const firebirdOptions = {
   host: _config.default.host,
-  port: 3050,
+  port: _config.default.firebirdPort,
   database: _config.default.connectionString,
-  user: 'SYSDBA',
-  password: 'masterkey',
+  user: _config.default.firebirdUser,
+  password: _config.default.firebirdPassword,
   lowercase_keys: false,
   role: null,
   pageSize: 4096

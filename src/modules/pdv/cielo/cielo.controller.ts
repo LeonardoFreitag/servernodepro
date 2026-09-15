@@ -135,3 +135,70 @@ export async function registrarPagamento(req: Request, res: Response): Promise<v
     res.status(500).send({ error: 'Erro ao salvar pagamento no banco de dados.' });
   }
 }
+
+type PagamentoRow = {
+  ID: number;
+  MEIO_PAGAMENTO: string;
+  BANDEIRA: string;
+  VALOR_PAGO: number;
+  AUTH_CODE: string;
+  NSU: string;
+};
+
+function selectPagamentosByMesa(codMesa: number): Promise<PagamentoRow[]> {
+  return new Promise((resolve, reject) => {
+    Firebird.attach(firebirdOptions, (err, db) => {
+      if (err) return reject(err);
+      db.query(
+        `SELECT ID, MEIO_PAGAMENTO, BANDEIRA, VALOR_PAGO, AUTH_CODE, NSU
+           FROM CIELO_PAGAMENTOS
+          WHERE COD_MESA = ?
+          ORDER BY ID`,
+        [codMesa],
+        (err, result) => {
+          if (err) { db.detach(); return reject(err); }
+          resolve(result as PagamentoRow[]);
+          db.detach();
+        }
+      );
+    });
+  });
+}
+
+/**
+ * GET /cielo/pagamentos/:codMesa
+ *
+ * Lista os pagamentos Cielo já registrados para a comanda e o total pago.
+ * Só entram em CIELO_PAGAMENTOS transações aprovadas (o app grava após o
+ * retorno de sucesso da Cielo), portanto a soma representa o valor recebido.
+ * Usado pelo app para restaurar pagamentos parciais e bloquear novas cobranças
+ * quando a conta já foi totalmente recebida.
+ *
+ * Resposta: { codMesa, totalPago, pagamentos: [{ id, meioPagamento, bandeira, valorPago, authCode, nsu }] }
+ */
+export async function listarPagamentosMesa(req: Request, res: Response): Promise<void> {
+  const codMesa = Number(req.params.codMesa);
+
+  if (!codMesa) {
+    res.status(400).send({ error: 'codMesa inválido.' });
+    return;
+  }
+
+  try {
+    const rows = await selectPagamentosByMesa(codMesa);
+    const pagamentos = rows.map(r => ({
+      id:            r.ID,
+      meioPagamento: r.MEIO_PAGAMENTO ?? '',
+      bandeira:      r.BANDEIRA ?? '',
+      valorPago:     Number(r.VALOR_PAGO ?? 0),
+      authCode:      r.AUTH_CODE ?? '',
+      nsu:           r.NSU ?? '',
+    }));
+    const totalPago = Math.round(pagamentos.reduce((sum, p) => sum + p.valorPago, 0) * 100) / 100;
+
+    res.status(200).send({ codMesa, totalPago, pagamentos });
+  } catch (error) {
+    console.error('[cielo] Erro ao listar pagamentos da mesa:', error);
+    res.status(500).send({ error: 'Erro ao consultar pagamentos no banco de dados.' });
+  }
+}

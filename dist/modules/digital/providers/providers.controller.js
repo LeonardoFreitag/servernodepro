@@ -8,6 +8,9 @@ exports.get = get;
 exports.post = post;
 exports.put = put;
 var _firebase = require("../../../shared/firebase/firebase.config");
+var _heartbeat = require("./heartbeat.service");
+var _status = require("./status.cache");
+var _datetime = require("../../../shared/utils/datetime");
 const fb = _firebase.firebase;
 function get(req, res, next) {
   const data = req.body;
@@ -76,10 +79,18 @@ function put(req, res, next) {
   const data = req.body;
   fb.auth().signInWithEmailAndPassword(data.email, data.password).then(() => {
     fb.firestore().collection('providers').doc(data.id).update({
-      open: data.open
-    }).then(() => res.status(200).send({
-      id: data.id
-    })).catch(erro => {
+      open: data.open,
+      openSource: 'manual',
+      openChangedAt: (0, _datetime.toIsoOffset)()
+    }).then(() => {
+      (0, _status.invalidateStatusCache)(data.id);
+      if (data.open === 'N') {
+        (0, _heartbeat.onManualClose)(data.id);
+      }
+      res.status(200).send({
+        id: data.id
+      });
+    }).catch(erro => {
       res.status(400).send(erro);
       console.log(erro);
     });

@@ -12,8 +12,14 @@ exports.put = put;
 var _nodeFirebird = _interopRequireDefault(require("node-firebird"));
 var _firebird = _interopRequireDefault(require("../../../shared/database/firebird"));
 var _firebase = require("../../../shared/firebase/firebase.config");
+var _config = _interopRequireDefault(require("../../../config"));
 function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 const fb = _firebase.firebase;
+async function ensureAuth() {
+  if (fb.auth().currentUser == null) {
+    await fb.auth().signInWithEmailAndPassword(_config.default.firebaseEmail, _config.default.firebasePassword);
+  }
+}
 function getEstoque(req, res, next) {
   _nodeFirebird.default.attach(_firebird.default, (err, db) => {
     if (err) throw err;
@@ -26,7 +32,8 @@ function getEstoque(req, res, next) {
         grupo: item.GRUPO,
         subgrupo: item.SUBGRUPO,
         fracionado: item.FRACIONADO,
-        impressao: item.IMPRESSO
+        impressao: item.IMPRESSO,
+        cobrarServico: (item.COBRAR_SERVICO ?? 'N').toString().trim()
       }));
       res.status(200).send(dataResult);
       db.detach();
@@ -34,12 +41,14 @@ function getEstoque(req, res, next) {
   });
 }
 function getCardapio(req, res, next) {
-  const idProvider = req.body.idProvider;
+  const {
+    idProvider
+  } = req.query;
   if (!idProvider) {
     throw new Error('Id Provider is required!');
   }
   const products = [];
-  fb.firestore().collection('products').where('idProvider', '==', idProvider).orderBy('description').get().then(result => {
+  fb.firestore().collection('products').where('idProvider', '==', idProvider).get().then(result => {
     result.forEach(item => {
       const d = item.data();
       products.push({
@@ -59,13 +68,13 @@ function getCardapio(req, res, next) {
         portionSize: d.portionSize
       });
     });
+    products.sort((a, b) => (a.description || '').localeCompare(b.description || ''));
     res.status(200).send(products);
   });
 }
 async function post(req, res) {
   const data = req.body;
   const id = data.id || fb.firestore().collection('products').doc().id;
-  let user = fb.auth().currentUser;
   const payload = {
     idProvider: data.idProvider,
     id,
@@ -105,58 +114,61 @@ async function post(req, res) {
     sunday_start: data.sunday_start,
     sunday_stop: data.sunday_stop
   };
-  const save = () => fb.firestore().collection('products').doc(id).set(payload).then(() => res.status(201).send({
-    id
-  })).catch(erro => {
-    res.status(400).send(erro);
+  try {
+    await ensureAuth();
+    await fb.firestore().collection('products').doc(id).set(payload);
+    res.status(201).send({
+      id
+    });
+  } catch (erro) {
     console.log(erro);
-  });
-  if (user == null) {
-    await fb.auth().signInWithEmailAndPassword(data.email, data.password);
-    save();
-  } else {
-    save();
+    res.status(400).send({
+      message: erro.message
+    });
   }
 }
 async function del(req, res) {
   const data = req.body;
-  let user = fb.auth().currentUser;
-  const remove = () => fb.firestore().collection('products').doc(data.id).delete().then(() => res.status(201).json({
-    resp: 'ok'
-  })).catch(erro => {
+  // console.log('Delete product', data);
+
+  if (!data.id) {
     res.status(400).json({
-      resp: 'error'
+      resp: 'error',
+      message: 'id is required'
     });
+    return;
+  }
+  try {
+    await ensureAuth();
+    await fb.firestore().collection('products').doc(data.id).delete();
+    res.status(200).json({
+      resp: 'ok'
+    });
+  } catch (erro) {
     console.log(erro);
-  });
-  if (user == null) {
-    await fb.auth().signInWithEmailAndPassword(data.email, data.password);
-    remove();
-  } else {
-    remove();
+    res.status(400).json({
+      resp: 'error',
+      message: erro.message
+    });
   }
 }
 async function clearProducts(req, res) {
   const data = req.body;
-  let user = fb.auth().currentUser;
-  const clear = async () => {
+  try {
+    await ensureAuth();
     const result = await fb.firestore().collection('products').where('idProvider', '==', data.idProvider).get();
-    for (const item of result) {
-      await fb.firestore().collection('products').doc(item.data().id).delete().then(() => res.status(201).json({
-        resp: 'ok'
-      })).catch(erro => {
-        res.status(400).json({
-          resp: 'error'
-        });
-        console.log(erro);
-      });
-    }
-  };
-  if (user == null) {
-    await fb.auth().signInWithEmailAndPassword(data.email, data.password);
-    clear();
-  } else {
-    clear();
+    const deletePromises = result.docs.map(item => fb.firestore().collection('products').doc(item.id).delete());
+    await Promise.all(deletePromises);
+    res.status(200).json({
+      resp: 'ok',
+      deleted: result.docs.length
+    });
+  } catch (erro) {
+    console.log(erro);
+    res.status(400).json({
+      resp: 'error',
+      message: erro.message
+    });
   }
 }
 function put(req, res, next) {

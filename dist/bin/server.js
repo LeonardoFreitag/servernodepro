@@ -6,6 +6,7 @@ var _debug = _interopRequireDefault(require("debug"));
 var _config = _interopRequireDefault(require("../config"));
 var requests = _interopRequireWildcard(require("../modules/digital/requests/requests.service"));
 var providers = _interopRequireWildcard(require("../modules/digital/providers/providers.service"));
+var _heartbeat = require("../modules/digital/providers/heartbeat.service");
 function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]); return f; })(e, t); }
 function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 const log = (0, _debug.default)('nodestr:server');
@@ -20,6 +21,7 @@ providers.getProviderId(result => {
 setInterval(() => {
   requests.getNewRequests(idProvider);
 }, 15000);
+(0, _heartbeat.startWatchdog)();
 server.listen(port);
 server.on('error', onError);
 server.on('listening', onListening);
