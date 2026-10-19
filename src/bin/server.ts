@@ -5,6 +5,8 @@ import config from '../config';
 import * as requests from '../modules/digital/requests/requests.service';
 import * as providers from '../modules/digital/providers/providers.service';
 import { startWatchdog } from '../modules/digital/providers/heartbeat.service';
+import { expirarPendentes } from '../modules/pdv/cobrancas/cobrancas.service';
+import { obterVersaoDb } from '../shared/database/dbVersion';
 
 const log = debug('nodestr:server');
 
@@ -25,6 +27,17 @@ setInterval(() => {
 }, 15000);
 
 startWatchdog();
+
+// Cobranças de maquineta: expira `pending` vencidas (nunca `sent_to_terminal`).
+// Tolerante a erro de conexão (só loga).
+setInterval(() => { expirarPendentes(); }, 30000);
+
+// Autoverificação do schema na subida (o mesmo que GET /health devolve).
+obterVersaoDb(true).then((v) => {
+  if (v.ok) console.log(`[db] VERSAO_SCRIPTS = ${v.scriptAtual} (mínimo ${v.scriptMinimo}) — ok`);
+  else if (v.scriptAtual == null) console.error(`[db] Banco inacessível na subida: ${v.erro}`);
+  else console.error(`[db] BANCO_DESATUALIZADO: script ${v.scriptAtual} < mínimo ${v.scriptMinimo}. Rode o Script23 antes de usar /pagamentos e /cobrancas.`);
+});
 
 server.listen(port);
 server.on('error', onError);

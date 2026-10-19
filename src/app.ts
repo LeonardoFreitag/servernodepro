@@ -12,7 +12,10 @@ import obsRoutes from './modules/pdv/obs/obs.routes';
 import mesasRoutes from './modules/pdv/mesas/mesas.routes';
 import itensRoutes from './modules/pdv/itens/itens.routes';
 import cieloRoutes from './modules/pdv/cielo/cielo.routes';
+import pagamentosRoutes from './modules/pdv/pagamentos/pagamentos.routes';
+import cobrancasRoutes from './modules/pdv/cobrancas/cobrancas.routes';
 import nfceRoutes from './modules/pdv/nfce/nfce.routes';
+import { healthHandler, requireDbVersion } from './shared/database/dbVersion';
 
 // Digital
 import cardapioRoutes from './modules/digital/cardapio/cardapio.routes';
@@ -37,6 +40,10 @@ app.get('/', (req: Request, res: Response) => {
   res.status(200).send({ title: 'Mettre API', version: '0.0.2' });
 });
 
+// Versão do schema do banco (VERSAO_SCRIPTS). O app lê na abertura e bloqueia
+// "Pagar na maquininha" quando `db.ok` é false.
+app.get('/health', healthHandler);
+
 // PDV
 app.use('/config', configRoutes);
 app.use('/func', funcRoutes);
@@ -45,7 +52,10 @@ app.use('/subgrupos', subgruposRoutes);
 app.use('/obs', obsRoutes);
 app.use('/mesas', mesasRoutes);
 app.use('/itens', itensRoutes);
-app.use('/cielo', cieloRoutes);
+// Pagamentos de maquineta: 503 BANCO_DESATUALIZADO se o banco não tem o Script23.
+app.use('/cielo', requireDbVersion, cieloRoutes); // legado — alias de /pagamentos
+app.use('/pagamentos', requireDbVersion, pagamentosRoutes);
+app.use('/cobrancas', requireDbVersion, cobrancasRoutes);
 app.use('/nfce', nfceRoutes);
 
 // Digital

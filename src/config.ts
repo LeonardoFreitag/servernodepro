@@ -18,6 +18,8 @@ interface Config {
   frontendUrl: string;
   firebaseEmail: string;
   firebasePassword: string;
+  /** Chave exigida em /cobrancas e POST /pagamentos (vazia = não exige). */
+  apiKey: string;
 }
 
 const config: Config = {
@@ -35,6 +37,7 @@ const config: Config = {
   frontendUrl: process.env.FRONTEND_URL || '',
   firebaseEmail: process.env.FIREBASE_EMAIL || '',
   firebasePassword: process.env.FIREBASE_PASSWORD || '',
+  apiKey: process.env.API_KEY || '',
 };
 
 export default config;
