@@ -12,6 +12,17 @@ var _dbVersion = require("../shared/database/dbVersion");
 function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]); return f; })(e, t); }
 function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 const log = (0, _debug.default)('nodestr:server');
+
+// O node-firebird 0.9.9 lança exceções de dentro do callback do socket (ex.: tipo
+// SQL desconhecido, como INT128 no Firebird 4+). Sem isto, UMA consulta ruim
+// derruba a API para todos os terminais. Loga e segue; cada requisição abre a
+// própria conexão, então o estado inconsistente morre com ela.
+process.on('uncaughtException', err => {
+  console.error('[fatal-evitado] uncaughtException:', err?.stack ?? err);
+});
+process.on('unhandledRejection', reason => {
+  console.error('[fatal-evitado] unhandledRejection:', reason?.stack ?? reason);
+});
 const port = normalizePort(process.env.PORT || _config.default.port);
 _app.default.set('port', port);
 const server = _http.default.createServer(_app.default);

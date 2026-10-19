@@ -135,7 +135,7 @@ async function listar(req, res) {
   const codVenda = Number(req.params.codVenda);
   if (!(0, _pagamentos.isOrigem)(origem)) {
     res.status(400).send({
-      error: 'origem inválida: M | B | E.'
+      error: `origem inválida: ${_pagamentos.ORIGENS.join(' | ')}.`
     });
     return;
   }
