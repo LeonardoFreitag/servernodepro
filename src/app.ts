@@ -16,6 +16,7 @@ import pagamentosRoutes from './modules/pdv/pagamentos/pagamentos.routes';
 import cobrancasRoutes from './modules/pdv/cobrancas/cobrancas.routes';
 import nfceRoutes from './modules/pdv/nfce/nfce.routes';
 import { healthHandler, requireDbVersion } from './shared/database/dbVersion';
+import config from './config';
 
 // Digital
 import cardapioRoutes from './modules/digital/cardapio/cardapio.routes';
@@ -37,36 +38,41 @@ app.use(express.static(path.join(__dirname, 'images')));
 app.use(express.static(path.join(__dirname, 'views')));
 
 app.get('/', (req: Request, res: Response) => {
-  res.status(200).send({ title: 'Mettre API', version: '0.0.2' });
+  res.status(200).send({ title: config.isAutoMax ? 'AutoMax API' : 'Mettre API', version: '0.0.2', modo: config.modo });
 });
 
 // Versão do schema do banco (VERSAO_SCRIPTS). O app lê na abertura e bloqueia
 // "Pagar na maquininha" quando `db.ok` é false.
 app.get('/health', healthHandler);
 
-// PDV
+// Comum aos dois sistemas: login do app (V_FUNC), credenciais Cielo, fila de maquineta.
 app.use('/config', configRoutes);
 app.use('/func', funcRoutes);
-app.use('/grupos', gruposRoutes);
-app.use('/subgrupos', subgruposRoutes);
-app.use('/obs', obsRoutes);
-app.use('/mesas', mesasRoutes);
-app.use('/itens', itensRoutes);
-// Pagamentos de maquineta: 503 BANCO_DESATUALIZADO se o banco não tem o Script23.
+// Pagamentos de maquineta: 503 BANCO_DESATUALIZADO se o banco não tem o Script23
+// (no AutoMax, o Script_AutoMax_Maquininha_v1 — mesmo NUMERO 23 em VERSAO_SCRIPTS).
 app.use('/cielo', requireDbVersion, cieloRoutes); // legado — alias de /pagamentos
 app.use('/pagamentos', requireDbVersion, pagamentosRoutes);
 app.use('/cobrancas', requireDbVersion, cobrancasRoutes);
-app.use('/nfce', nfceRoutes);
 
-// Digital
-app.use('/products', cardapioRoutes);
-app.use('/productManager', productManagerRoutes);
-app.use('/providers', providersRoutes);
-app.use('/neighborhood', neighborhoodRoutes);
-app.use('/payment', paymentRoutes);
-app.use('/request', requestsRoutes);
-app.use('/entregas', entregasRoutes);
-app.use('/delivery', deliveryRoutes);
-app.use('/restaurante', restauranteRoutes);
+if (!config.isAutoMax) {
+  // PDV Mettre (comandas)
+  app.use('/grupos', gruposRoutes);
+  app.use('/subgrupos', subgruposRoutes);
+  app.use('/obs', obsRoutes);
+  app.use('/mesas', mesasRoutes);
+  app.use('/itens', itensRoutes);
+  app.use('/nfce', nfceRoutes);
+
+  // Digital
+  app.use('/products', cardapioRoutes);
+  app.use('/productManager', productManagerRoutes);
+  app.use('/providers', providersRoutes);
+  app.use('/neighborhood', neighborhoodRoutes);
+  app.use('/payment', paymentRoutes);
+  app.use('/request', requestsRoutes);
+  app.use('/entregas', entregasRoutes);
+  app.use('/delivery', deliveryRoutes);
+  app.use('/restaurante', restauranteRoutes);
+}
 
 export default app;

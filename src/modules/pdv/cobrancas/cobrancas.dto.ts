@@ -1,5 +1,7 @@
 import { toIso } from '../../../shared/database/fb';
 
+import { Origem } from '../pagamentos/pagamentos.mapping';
+
 export const STATUS_FINAIS = ['approved', 'declined', 'canceled', 'expired', 'error'] as const;
 export type CobrancaStatus = 'pending' | 'sent_to_terminal' | (typeof STATUS_FINAIS)[number];
 
@@ -21,7 +23,7 @@ export interface CobrancaAlvo {
 
 export interface CobrancaDTO {
   id: string;
-  origem: 'M' | 'B' | 'E';
+  origem: Origem;
   codVenda: number;
   valorCents: number;
   tipoPre: string | null;
@@ -81,7 +83,7 @@ export function rowToDTO(r: any): CobrancaDTO {
 
   return {
     id: String(r.ID).trim(),
-    origem: trim(r.ORIGEM) as 'M' | 'B' | 'E',
+    origem: trim(r.ORIGEM) as Origem,
     codVenda: Number(r.COD_VENDA),
     valorCents: Math.round(Number(r.VALOR ?? 0) * 100),
     tipoPre: trim(r.TIPO_PRE),

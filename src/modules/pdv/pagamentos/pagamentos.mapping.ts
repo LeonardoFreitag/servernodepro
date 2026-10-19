@@ -4,12 +4,21 @@
  *
  * Funções puras — sem banco — para serem testadas com jest.
  */
+import config from '../../../config';
 
 export const PROVIDERS = ['CIELO', 'STONE'] as const;
 export type Provider = (typeof PROVIDERS)[number];
 
-export const ORIGENS = ['M', 'B', 'E'] as const;
-export type Origem = (typeof ORIGENS)[number];
+/**
+ * ORIGEM da venda, conforme o sistema dono do banco (config.modo):
+ *  - Mettre:  M mesa | B balcão | E entrega  (MESAS_ABERTAS / BALCAO / ENTREGAS)
+ *  - AutoMax: V venda | S ordem de serviço | A  (PDV_RECEB_PAGTOS.ORIGEM)
+ * COD_MESA/COD_VENDA recebem o código da venda conforme a origem.
+ */
+export const ORIGENS_METTRE = ['M', 'B', 'E'] as const;
+export const ORIGENS_AUTOMAX = ['V', 'S', 'A'] as const;
+export const ORIGENS: readonly string[] = config.isAutoMax ? ORIGENS_AUTOMAX : ORIGENS_METTRE;
+export type Origem = (typeof ORIGENS_METTRE)[number] | (typeof ORIGENS_AUTOMAX)[number];
 
 export const TRANSACTION_TYPES = ['CREDIT', 'DEBIT', 'VOUCHER', 'INSTANT_PAYMENT'] as const;
 export type TransactionType = (typeof TRANSACTION_TYPES)[number];
@@ -261,7 +270,7 @@ export function mapPagamentoToColumns(input: PagamentoInput): PagamentoColumns {
 export function validarPagamentoInput(body: any): { input?: PagamentoInput; error?: string } {
   if (!body || typeof body !== 'object') return { error: 'Corpo da requisição ausente.' };
   if (!isProvider(body.provider)) return { error: 'provider é obrigatório: CIELO | STONE.' };
-  if (!isOrigem(body.origem)) return { error: 'origem é obrigatória: M | B | E.' };
+  if (!isOrigem(body.origem)) return { error: `origem é obrigatória: ${ORIGENS.join(' | ')}.` };
   const codVenda = Number(body.codVenda);
   if (!Number.isInteger(codVenda) || codVenda <= 0) return { error: 'codVenda é obrigatório (inteiro > 0).' };
   if (!isTransactionType(body.transactionType)) {

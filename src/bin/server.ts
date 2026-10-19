@@ -17,16 +17,20 @@ const server = http.createServer(app);
 
 let idProvider = '';
 
-providers.getProviderId((result: string) => {
-  console.log(result);
-  idProvider = result;
-});
+// Módulo digital (cardápio web, pedidos, heartbeat): só existe no Mettre.
+// No AutoMax as tabelas CONFIG/WEB_* não existem — os jobs não sobem.
+if (!config.isAutoMax) {
+  providers.getProviderId((result: string) => {
+    console.log(result);
+    idProvider = result;
+  });
 
-setInterval(() => {
-  requests.getNewRequests(idProvider);
-}, 15000);
+  setInterval(() => {
+    requests.getNewRequests(idProvider);
+  }, 15000);
 
-startWatchdog();
+  startWatchdog();
+}
 
 // Cobranças de maquineta: expira `pending` vencidas (nunca `sent_to_terminal`).
 // Tolerante a erro de conexão (só loga).
@@ -42,7 +46,7 @@ obterVersaoDb(true).then((v) => {
 server.listen(port);
 server.on('error', onError);
 server.on('listening', onListening);
-console.log('API rodando na porta ' + port);
+console.log(`API rodando na porta ${port} (modo ${config.modo})`);
 
 function normalizePort(val: string | number): number | string | false {
   const portNum = parseInt(String(val), 10);

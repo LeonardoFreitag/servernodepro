@@ -20,7 +20,17 @@ interface Config {
   firebasePassword: string;
   /** Chave exigida em /cobrancas e POST /pagamentos (vazia = não exige). */
   apiKey: string;
+  /**
+   * Sistema dono do banco: 'METTRE' (restaurante — mesas/balcão/entrega, módulo
+   * digital) ou 'AUTOMAX' (varejo — só a fila de maquineta: /func, /config,
+   * /health, /pagamentos, /cobrancas). Decide quais rotas sobem, quais jobs
+   * rodam e quais ORIGENS são aceitas (M|B|E vs V|S|A).
+   */
+  modo: 'METTRE' | 'AUTOMAX';
+  isAutoMax: boolean;
 }
+
+const modo: Config['modo'] = (process.env.MODO ?? 'METTRE').trim().toUpperCase() === 'AUTOMAX' ? 'AUTOMAX' : 'METTRE';
 
 const config: Config = {
   host: process.env.FIREBIRD_HOST || '',  
@@ -38,6 +48,8 @@ const config: Config = {
   firebaseEmail: process.env.FIREBASE_EMAIL || '',
   firebasePassword: process.env.FIREBASE_PASSWORD || '',
   apiKey: process.env.API_KEY || '',
+  modo,
+  isAutoMax: modo === 'AUTOMAX',
 };
 
 export default config;

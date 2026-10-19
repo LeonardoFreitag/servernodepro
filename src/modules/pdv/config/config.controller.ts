@@ -1,10 +1,24 @@
 import { Request, Response, NextFunction } from 'express';
 import Firebird from 'node-firebird';
 import firebirdOptions from '../../../shared/database/firebird';
+import config from '../../../config';
 
 export function get(req: Request, res: Response, next: NextFunction): void {
+  // AutoMax: não há tabela CONFIG; o app só precisa das credenciais Cielo
+  // (vêm do .env da loja) — os campos de restaurante vão neutros.
+  if (config.isAutoMax) {
+    res.status(200).send({
+      vLimitePedacos:   null,
+      cieloClientId:    process.env.CIELO_CLIENT_ID    ?? '',
+      cieloAccessToken: process.env.CIELO_ACCESS_TOKEN ?? '',
+      cobrServico:      'N',
+      perServico:       0,
+    });
+    return;
+  }
+
   Firebird.attach(firebirdOptions, (err, db) => {
-    if (err) throw err;
+    if (err) return next(err);
 
     db.query('SELECT V_LIMITE_PEDACOS, V_COBR_SERVICO, V_PER_SERVICO FROM config', (err, result) => {
       const row = result?.[0] ?? {};
