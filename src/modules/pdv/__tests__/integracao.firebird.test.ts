@@ -285,7 +285,7 @@ bloco('estorno (OPERACAO C)', () => {
     const dto = await cob.obter(est);
     expect(dto!.alvo).toMatchObject({
       pagamentoId, provider: 'CIELO', atk: null, cieloOrderId: 'ORDER-3',
-      authCode: 'A1B2C3', cieloCode: 'CC9', valorCents: 1234, transactionType: 'CREDIT', installments: 2,
+      authCode: 'A1B2C3', cieloCode: 'CC9', merchantCode: 'EC77', valorCents: 1234, transactionType: 'CREDIT', installments: 2,
     });
 
     await cob.claim(est, 'CAIXA1');

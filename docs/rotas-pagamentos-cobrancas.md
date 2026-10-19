@@ -82,7 +82,7 @@ A checagem acontece dentro da mesma transação e do mesmo `SELECT ... WITH LOCK
 
 ### DTO de cobrança
 
-Ver `cobrancas.dto.ts` (`rowToDTO`). `alvo` só vem em `OPERACAO='C'`: `{ pagamentoId, provider, atk, cieloOrderId, authCode, cieloCode, valorCents, transactionType, installments }`.
+Ver `cobrancas.dto.ts` (`rowToDTO`). `alvo` só vem em `OPERACAO='C'`: `{ pagamentoId, provider, atk, cieloOrderId, authCode, cieloCode, merchantCode, valorCents, transactionType, installments }`. `merchantCode` = `CIELO_PAGAMENTOS.COD_EC` (Cielo: `merchantCode` do pagamento; Stone: `null`) — o deep link `lio://payment-reversal` exige `merchantCode` e `value` (= `valorCents`) além de `cieloCode`/`authCode`, senão a maquineta responde "Parâmetros inválidos: Json inválido".
 
 ## Convenções Stone (Etapa B)
 

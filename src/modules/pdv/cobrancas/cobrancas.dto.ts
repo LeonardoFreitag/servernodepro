@@ -16,6 +16,8 @@ export interface CobrancaAlvo {
   cieloOrderId: string | null;
   authCode: string | null;
   cieloCode: string | null;
+  /** COD_EC do pagamento (Cielo: `merchantCode`). O deep link `lio://payment-reversal` exige junto com `value`. */
+  merchantCode: string | null;
   valorCents: number;
   transactionType: string;
   installments: number;
@@ -54,7 +56,8 @@ export const SELECT_COBRANCA = `
          C.DESCRICAO, C.EXTERNAL_REF, C.STATUS, C.CANCEL_REQUESTED, C.PROVIDER,
          C.PAGAMENTO_ID, C.MOTIVO_ERRO, C.CONSUMIDO, C.CRIADO_EM, C.EXPIRA_EM, C.ATUALIZADO_EM,
          P.ID AS P_ID, P.PROVIDER AS P_PROVIDER, P.ATK AS P_ATK, P.CIELO_ORDER_ID AS P_ORDER_ID,
-         P.AUTH_CODE AS P_AUTH_CODE, P.CIELO_CODE AS P_CIELO_CODE, P.VALOR_PAGO AS P_VALOR_PAGO,
+         P.AUTH_CODE AS P_AUTH_CODE, P.CIELO_CODE AS P_CIELO_CODE, P.COD_EC AS P_MERCHANT_CODE,
+         P.VALOR_PAGO AS P_VALOR_PAGO,
          P.TRANSACTION_TYPE AS P_TRANSACTION_TYPE, P.PARCELAS AS P_PARCELAS
     FROM COBRANCAS_TERMINAL C
     LEFT JOIN CIELO_PAGAMENTOS P ON P.ID = C.ALVO_PAGAMENTO_ID`;
@@ -75,6 +78,7 @@ export function rowToDTO(r: any): CobrancaDTO {
         cieloOrderId: trim(r.P_ORDER_ID),
         authCode: trim(r.P_AUTH_CODE),
         cieloCode: trim(r.P_CIELO_CODE),
+        merchantCode: trim(r.P_MERCHANT_CODE),
         valorCents: Math.round(Number(r.P_VALOR_PAGO ?? 0) * 100),
         transactionType: trim(r.P_TRANSACTION_TYPE) ?? '',
         installments: Number(r.P_PARCELAS ?? 1) || 1,
