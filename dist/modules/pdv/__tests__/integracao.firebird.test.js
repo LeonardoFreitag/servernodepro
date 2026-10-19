@@ -511,6 +511,7 @@ bloco('estorno (OPERACAO C)', () => {
       cieloOrderId: 'ORDER-3',
       authCode: 'A1B2C3',
       cieloCode: 'CC9',
+      merchantCode: 'EC77',
       valorCents: 1234,
       transactionType: 'CREDIT',
       installments: 2

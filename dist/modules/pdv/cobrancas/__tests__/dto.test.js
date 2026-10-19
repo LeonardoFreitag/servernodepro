@@ -57,6 +57,7 @@ describe('rowToDTO', () => {
       P_ORDER_ID: 'ORDER-1',
       P_AUTH_CODE: 'AUTH',
       P_CIELO_CODE: 'CC',
+      P_MERCHANT_CODE: ' EC-77 ',
       P_VALOR_PAGO: 12.34,
       P_TRANSACTION_TYPE: 'CREDIT',
       P_PARCELAS: 2
@@ -68,9 +69,26 @@ describe('rowToDTO', () => {
       cieloOrderId: 'ORDER-1',
       authCode: 'AUTH',
       cieloCode: 'CC',
+      merchantCode: 'EC-77',
       valorCents: 1234,
       transactionType: 'CREDIT',
       installments: 2
+    });
+  });
+  it('alvo sem COD_EC (Stone) → merchantCode null', () => {
+    const dto = (0, _cobrancas.rowToDTO)({
+      ...base,
+      OPERACAO: 'C',
+      ALVO_PAGAMENTO_ID: 42,
+      P_ID: 42,
+      P_PROVIDER: 'STONE',
+      P_ATK: 'ATK-1',
+      P_VALOR_PAGO: 1
+    });
+    expect(dto.alvo).toMatchObject({
+      provider: 'STONE',
+      atk: 'ATK-1',
+      merchantCode: null
     });
   });
   it('isStatusFinal', () => {
