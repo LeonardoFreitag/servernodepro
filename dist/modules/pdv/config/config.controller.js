@@ -9,10 +9,23 @@ exports.post = post;
 exports.put = put;
 var _nodeFirebird = _interopRequireDefault(require("node-firebird"));
 var _firebird = _interopRequireDefault(require("../../../shared/database/firebird"));
+var _config = _interopRequireDefault(require("../../../config"));
 function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function get(req, res, next) {
+  // AutoMax: não há tabela CONFIG; o app só precisa das credenciais Cielo
+  // (vêm do .env da loja) — os campos de restaurante vão neutros.
+  if (_config.default.isAutoMax) {
+    res.status(200).send({
+      vLimitePedacos: null,
+      cieloClientId: process.env.CIELO_CLIENT_ID ?? '',
+      cieloAccessToken: process.env.CIELO_ACCESS_TOKEN ?? '',
+      cobrServico: 'N',
+      perServico: 0
+    });
+    return;
+  }
   _nodeFirebird.default.attach(_firebird.default, (err, db) => {
-    if (err) throw err;
+    if (err) return next(err);
     db.query('SELECT V_LIMITE_PEDACOS, V_COBR_SERVICO, V_PER_SERVICO FROM config', (err, result) => {
       const row = result?.[0] ?? {};
       res.status(200).send({

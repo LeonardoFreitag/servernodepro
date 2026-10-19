@@ -16,14 +16,19 @@ const port = normalizePort(process.env.PORT || _config.default.port);
 _app.default.set('port', port);
 const server = _http.default.createServer(_app.default);
 let idProvider = '';
-providers.getProviderId(result => {
-  console.log(result);
-  idProvider = result;
-});
-setInterval(() => {
-  requests.getNewRequests(idProvider);
-}, 15000);
-(0, _heartbeat.startWatchdog)();
+
+// Módulo digital (cardápio web, pedidos, heartbeat): só existe no Mettre.
+// No AutoMax as tabelas CONFIG/WEB_* não existem — os jobs não sobem.
+if (!_config.default.isAutoMax) {
+  providers.getProviderId(result => {
+    console.log(result);
+    idProvider = result;
+  });
+  setInterval(() => {
+    requests.getNewRequests(idProvider);
+  }, 15000);
+  (0, _heartbeat.startWatchdog)();
+}
 
 // Cobranças de maquineta: expira `pending` vencidas (nunca `sent_to_terminal`).
 // Tolerante a erro de conexão (só loga).
@@ -38,7 +43,7 @@ setInterval(() => {
 server.listen(port);
 server.on('error', onError);
 server.on('listening', onListening);
-console.log('API rodando na porta ' + port);
+console.log(`API rodando na porta ${port} (modo ${_config.default.modo})`);
 function normalizePort(val) {
   const portNum = parseInt(String(val), 10);
   if (isNaN(portNum)) return val;

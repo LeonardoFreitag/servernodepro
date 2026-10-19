@@ -10,6 +10,7 @@ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e
 _dotenv.default.config({
   path: _path.default.resolve(__dirname, '../.env')
 });
+const modo = (process.env.MODO ?? 'METTRE').trim().toUpperCase() === 'AUTOMAX' ? 'AUTOMAX' : 'METTRE';
 const config = {
   host: process.env.FIREBIRD_HOST || '',
   connectionString: process.env.CONNECTION_STRING || '',
@@ -25,6 +26,8 @@ const config = {
   frontendUrl: process.env.FRONTEND_URL || '',
   firebaseEmail: process.env.FIREBASE_EMAIL || '',
   firebasePassword: process.env.FIREBASE_PASSWORD || '',
-  apiKey: process.env.API_KEY || ''
+  apiKey: process.env.API_KEY || '',
+  modo,
+  isAutoMax: modo === 'AUTOMAX'
 };
 var _default = exports.default = config;

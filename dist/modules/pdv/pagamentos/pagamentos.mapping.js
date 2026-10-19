@@ -3,7 +3,7 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.TRANSACTION_TYPES = exports.PROVIDERS = exports.ORIGENS = void 0;
+exports.TRANSACTION_TYPES = exports.PROVIDERS = exports.ORIGENS_METTRE = exports.ORIGENS_AUTOMAX = exports.ORIGENS = void 0;
 exports.isOrigem = isOrigem;
 exports.isPixCielo = isPixCielo;
 exports.isProvider = isProvider;
@@ -14,6 +14,8 @@ exports.statusCodeDe = statusCodeDe;
 exports.transactionTypeFromCieloPaymentCode = transactionTypeFromCieloPaymentCode;
 exports.validarItensInput = validarItensInput;
 exports.validarPagamentoInput = validarPagamentoInput;
+var _config = _interopRequireDefault(require("../../../config"));
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 /**
  * Mapeamento provider-agnóstico de "pagamento feito na maquineta" para as
  * colunas de CIELO_PAGAMENTOS (nome mantido; hoje é "pagamentos de maquineta").
@@ -22,7 +24,15 @@ exports.validarPagamentoInput = validarPagamentoInput;
  */
 
 const PROVIDERS = exports.PROVIDERS = ['CIELO', 'STONE'];
-const ORIGENS = exports.ORIGENS = ['M', 'B', 'E'];
+/**
+ * ORIGEM da venda, conforme o sistema dono do banco (config.modo):
+ *  - Mettre:  M mesa | B balcão | E entrega  (MESAS_ABERTAS / BALCAO / ENTREGAS)
+ *  - AutoMax: V venda | S ordem de serviço | A  (PDV_RECEB_PAGTOS.ORIGEM)
+ * COD_MESA/COD_VENDA recebem o código da venda conforme a origem.
+ */
+const ORIGENS_METTRE = exports.ORIGENS_METTRE = ['M', 'B', 'E'];
+const ORIGENS_AUTOMAX = exports.ORIGENS_AUTOMAX = ['V', 'S', 'A'];
+const ORIGENS = exports.ORIGENS = _config.default.isAutoMax ? ORIGENS_AUTOMAX : ORIGENS_METTRE;
 const TRANSACTION_TYPES = exports.TRANSACTION_TYPES = ['CREDIT', 'DEBIT', 'VOUCHER', 'INSTANT_PAYMENT'];
 function isProvider(v) {
   return typeof v === 'string' && PROVIDERS.includes(v);
@@ -214,7 +224,7 @@ function validarPagamentoInput(body) {
     error: 'provider é obrigatório: CIELO | STONE.'
   };
   if (!isOrigem(body.origem)) return {
-    error: 'origem é obrigatória: M | B | E.'
+    error: `origem é obrigatória: ${ORIGENS.join(' | ')}.`
   };
   const codVenda = Number(body.codVenda);
   if (!Number.isInteger(codVenda) || codVenda <= 0) return {
