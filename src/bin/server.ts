@@ -10,6 +10,17 @@ import { obterVersaoDb } from '../shared/database/dbVersion';
 
 const log = debug('nodestr:server');
 
+// O node-firebird 0.9.9 lança exceções de dentro do callback do socket (ex.: tipo
+// SQL desconhecido, como INT128 no Firebird 4+). Sem isto, UMA consulta ruim
+// derruba a API para todos os terminais. Loga e segue; cada requisição abre a
+// própria conexão, então o estado inconsistente morre com ela.
+process.on('uncaughtException', (err) => {
+  console.error('[fatal-evitado] uncaughtException:', err?.stack ?? err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[fatal-evitado] unhandledRejection:', (reason as Error)?.stack ?? reason);
+});
+
 const port = normalizePort(process.env.PORT || config.port);
 app.set('port', port);
 

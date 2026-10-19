@@ -269,3 +269,29 @@ describe('legacyCieloBodyToInput (POST /cielo/pagamento)', () => {
     expect(c).toMatchObject({ STATUS_CODE: '0', AUTH_CODE: E2E, TRANSACTION_TYPE: 'INSTANT_PAYMENT' });
   });
 });
+
+describe('origens por modo (config.modo)', () => {
+  const carregar = (modo: string) => {
+    let mod: typeof import('../pagamentos.mapping');
+    jest.isolateModules(() => {
+      const anterior = process.env.MODO;
+      process.env.MODO = modo;
+      mod = require('../pagamentos.mapping');
+      process.env.MODO = anterior;
+    });
+    return mod!;
+  };
+  it('METTRE aceita M | B | E e recusa V', () => {
+    const m = carregar('METTRE');
+    expect([...m.ORIGENS]).toEqual(['M', 'B', 'E']);
+    expect(m.isOrigem('M')).toBe(true);
+    expect(m.isOrigem('V')).toBe(false);
+  });
+  it('AUTOMAX aceita V | S | A e recusa M (loja AutoMax, Firebird 5)', () => {
+    const m = carregar('AUTOMAX');
+    expect([...m.ORIGENS]).toEqual(['V', 'S', 'A']);
+    expect(m.isOrigem('V')).toBe(true);
+    expect(m.isOrigem('M')).toBe(false);
+    expect(m.validarPagamentoInput({ provider: 'CIELO', origem: 'M', codVenda: 1, transactionType: 'CREDIT', amountCents: 100 }).error).toMatch(/V \| S \| A/);
+  });
+});

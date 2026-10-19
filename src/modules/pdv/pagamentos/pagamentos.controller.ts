@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { isOrigem, legacyCieloBodyToInput, PagamentoInput, validarPagamentoInput } from './pagamentos.mapping';
+import { isOrigem, legacyCieloBodyToInput, ORIGENS, PagamentoInput, validarPagamentoInput } from './pagamentos.mapping';
 import * as service from './pagamentos.service';
 import { PagamentoError } from './pagamentos.service';
 import { logPagamento, resumoErro } from '../../../shared/utils/pagamentosLog';
@@ -73,7 +73,7 @@ export async function listar(req: Request, res: Response): Promise<void> {
   const origem = String(req.params.origem ?? '').toUpperCase();
   const codVenda = Number(req.params.codVenda);
   if (!isOrigem(origem)) {
-    res.status(400).send({ error: 'origem inválida: M | B | E.' });
+    res.status(400).send({ error: `origem inválida: ${ORIGENS.join(' | ')}.` });
     return;
   }
   if (!codVenda) {

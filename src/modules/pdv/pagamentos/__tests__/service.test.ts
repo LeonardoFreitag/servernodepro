@@ -133,6 +133,11 @@ describe('listarPagamentos — filtro igual ao do PDV', () => {
     expect(r.pagamentos[0]).toMatchObject({ id: 1, manual: true, consumido: false });
     expect(r.pagamentos[1]).toMatchObject({ id: 2, manual: false, consumido: true });
     expect(r.itensPagos).toEqual([{ codItem: 3, codConjuga: 0, qtde: 1, valor: 10.5 }]);
+    // Firebird 4+: SUM sobre NUMERIC vira INT128 e derruba o node-firebird 0.9.9 — sempre com CAST.
+    const itens = chamadas.find(c => c.sql.includes('CIELO_PAGAMENTOS_ITENS'))!;
+    expect(itens.sql).toMatch(/CAST\(SUM\(I\.QTDE\) AS NUMERIC\(15,3\)\)/);
+    expect(itens.sql).toMatch(/CAST\(SUM\(I\.VALOR\) AS NUMERIC\(15,2\)\)/);
+    expect(itens.sql).not.toMatch(/[^(]SUM\(/);
     for (const c of chamadas) {
       expect(c.sql).toMatch(/P\.STATUS_CODE IN \('0', '1'\)/);
       expect(c.sql).not.toMatch(/COALESCE\(P\.STATUS_CODE/);

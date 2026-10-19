@@ -106,3 +106,7 @@ Dois achados do teste de integração (16/09/2026), rodado contra um Firebird 3.
 Achado do smoke de 19/10/2026 (contra o banco de dev, Firebird 2.5.9):
 
 3. **node-firebird 0.9.9 não lê BLOB em `query()`.** A coluna vem como uma função de leitura preguiçosa que abre transação própria e falha com *"invalid BLOB ID"* — dentro de `WITH LOCK` e também depois do auto-commit. Para ler `PAYLOAD_JSON` a API usa `CAST(PAYLOAD_JSON AS VARCHAR(32000))` (o maior payload Cielo observado tem ~3 KB). Se o CAST estourar, o estorno manual é gravado assim mesmo, sem anotar no payload (o motivo fica em `logs/pagamentos.jsonl`).
+
+Achado do teste contra o Firebird 5 (AutoMax, 19/10/2026):
+
+4. **`SUM` sobre NUMERIC no Firebird 4+ devolve INT128**, tipo que o node-firebird 0.9.9 não conhece: o driver lança `Error: Unexpected` de dentro do callback do socket e **derruba o processo**. No 2.5 o mesmo `SUM` é BIGINT e funciona. Regra: toda agregação numérica em SQL leva `CAST(SUM(...) AS NUMERIC(p,s))`. `COUNT(*)` e `GEN_ID` não têm o problema. Como rede de segurança, `server.ts` registra `process.on('uncaughtException')` que loga `[fatal-evitado]` e mantém a API de pé.

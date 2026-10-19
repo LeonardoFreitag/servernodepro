@@ -179,8 +179,12 @@ export async function listarPagamentos(origem: Origem, codVenda: number): Promis
       [codVenda, origem],
     );
     // Mesmos filtros do pagamento: estorno libera os itens automaticamente.
+    // CAST nas somas: no Firebird 4+ SUM sobre NUMERIC devolve INT128, tipo que o
+    // node-firebird 0.9.9 não conhece ("Unexpected" e o processo cai). No 2.5 é BIGINT.
     const itemRows: any[] = await db.query(
-      `SELECT I.COD_ITEM, I.COD_CONJUGA, SUM(I.QTDE) AS QTDE, SUM(I.VALOR) AS VALOR
+      `SELECT I.COD_ITEM, I.COD_CONJUGA,
+              CAST(SUM(I.QTDE) AS NUMERIC(15,3)) AS QTDE,
+              CAST(SUM(I.VALOR) AS NUMERIC(15,2)) AS VALOR
          FROM CIELO_PAGAMENTOS_ITENS I
          JOIN CIELO_PAGAMENTOS P ON P.ID = I.PAGAMENTO_ID${FILTRO_PDV}
         GROUP BY I.COD_ITEM, I.COD_CONJUGA`,

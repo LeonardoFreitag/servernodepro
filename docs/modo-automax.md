@@ -55,6 +55,8 @@ GRANT USAGE ON SEQUENCE G_CIELO_PAGAMENTOS_ITENS TO API_MAQ;
 ```
 (`SYSDBA` com senha legada também funciona, mas o usuário dedicado limita o estrago de uma chave vazada.) Senha legada: máximo 8 caracteres significativos.
 
+Depois de conectar, há um segundo ponto do Firebird 5: `SUM` sobre NUMERIC devolve INT128, que o driver não conhece e trata como erro fatal. Toda agregação numérica na API usa `CAST(SUM(...) AS NUMERIC(p,s))` (ver achado 4 em `docs/rotas-pagamentos-cobrancas.md`); ao escrever SQL novo, manter a regra.
+
 Alternativa sem mexer no `firebird.conf`: migrar o driver para `node-firebird-driver-native` (usa `fbclient.dll`, suporta Srp e WireCrypt). Fica para depois — exige trocar `src/shared/database/fb.ts`.
 
 ## Instalação na loja (ordem)
