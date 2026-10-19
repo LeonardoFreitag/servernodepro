@@ -16,7 +16,10 @@ var _obs = _interopRequireDefault(require("./modules/pdv/obs/obs.routes"));
 var _mesas = _interopRequireDefault(require("./modules/pdv/mesas/mesas.routes"));
 var _itens = _interopRequireDefault(require("./modules/pdv/itens/itens.routes"));
 var _cielo = _interopRequireDefault(require("./modules/pdv/cielo/cielo.routes"));
+var _pagamentos = _interopRequireDefault(require("./modules/pdv/pagamentos/pagamentos.routes"));
+var _cobrancas = _interopRequireDefault(require("./modules/pdv/cobrancas/cobrancas.routes"));
 var _nfce = _interopRequireDefault(require("./modules/pdv/nfce/nfce.routes"));
+var _dbVersion = require("./shared/database/dbVersion");
 var _cardapio = _interopRequireDefault(require("./modules/digital/cardapio/cardapio.routes"));
 var _productManager = _interopRequireDefault(require("./modules/digital/cardapio/productManager.routes"));
 var _providers = _interopRequireDefault(require("./modules/digital/providers/providers.routes"));
@@ -49,6 +52,10 @@ app.get('/', (req, res) => {
   });
 });
 
+// Versão do schema do banco (VERSAO_SCRIPTS). O app lê na abertura e bloqueia
+// "Pagar na maquininha" quando `db.ok` é false.
+app.get('/health', _dbVersion.healthHandler);
+
 // PDV
 app.use('/config', _config.default);
 app.use('/func', _func.default);
@@ -57,7 +64,10 @@ app.use('/subgrupos', _subgrupos.default);
 app.use('/obs', _obs.default);
 app.use('/mesas', _mesas.default);
 app.use('/itens', _itens.default);
-app.use('/cielo', _cielo.default);
+// Pagamentos de maquineta: 503 BANCO_DESATUALIZADO se o banco não tem o Script23.
+app.use('/cielo', _dbVersion.requireDbVersion, _cielo.default); // legado — alias de /pagamentos
+app.use('/pagamentos', _dbVersion.requireDbVersion, _pagamentos.default);
+app.use('/cobrancas', _dbVersion.requireDbVersion, _cobrancas.default);
 app.use('/nfce', _nfce.default);
 
 // Digital

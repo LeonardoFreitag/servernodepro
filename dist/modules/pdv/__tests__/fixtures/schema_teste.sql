@@ -1,0 +1,179 @@
+/*
+ * Schema para o teste de integração `integracao.firebird.test.ts` contra um
+ * Firebird descartável.
+ *
+ * Fonte: DDL REAL do banco de desenvolvimento do Mettre (Firebird 2.5.9),
+ * extraído em 19/10/2026 das tabelas RDB$ — ou seja, o Script21 (Cobranças
+ * Terminal) mais o Script23 (Pagamentos Maquineta) tais como aplicados. Antes
+ * desta data o arquivo era uma reconstrução e divergia em triggers e índices.
+ *
+ * NÃO é o script de migração de produção: esse é o
+ * `Script23_Pagamentos_Maquineta.sql` da equipe Delphi (idempotente, EXECUTE
+ * BLOCK). Ver docs/migracao-pagamentos.md.
+ *
+ * Como usar (Firebird local, banco descartável):
+ *   isql -q -i schema_teste.sql
+ *   FB_INTEGRATION=1 npm test -- integracao
+ *
+ * Firebird 3+: node-firebird 0.9.9 só fala Legacy_Auth — ver observação no teste.
+ */
+SET SQL DIALECT 3;
+CONNECT 'localhost:/tmp/fbdb/mettre.fdb' USER 'SYSDBA' PASSWORD '7e9d8580';
+
+/* ---------------- CIELO_PAGAMENTOS (18 colunas originais + Script21 + Script23) ---------- */
+CREATE TABLE CIELO_PAGAMENTOS (
+  ID                INTEGER NOT NULL,
+  COD_MESA          INTEGER NOT NULL,
+  CIELO_ORDER_ID    VARCHAR(50),
+  DATA_HORA         TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  MEIO_PAGAMENTO    VARCHAR(40) NOT NULL,
+  BANDEIRA          VARCHAR(30),
+  VALOR_TOTAL       NUMERIC(10,2) NOT NULL,
+  VALOR_PAGO        NUMERIC(10,2) NOT NULL,
+  PARCELAS          SMALLINT DEFAULT 0,
+  AUTH_CODE         VARCHAR(40),              /* Script23: era 20 — Pix E2E tem 32 */
+  CIELO_CODE        VARCHAR(40),              /* Script23: era 20 */
+  NSU               VARCHAR(50),
+  TERMINAL          VARCHAR(40),
+  COD_EC            VARCHAR(30),
+  MASK_CARTAO       VARCHAR(25),
+  PRODUTO_PRIMARIO  VARCHAR(30),
+  PROD_SECUNDARIO   VARCHAR(30),
+  STATUS_CODE       CHAR(1),                  /* '0' Pix, '1' cartão, '2' cancelado — o PDV filtra IN ('0','1') */
+  PAYLOAD_JSON      BLOB SUB_TYPE TEXT,
+  /* Script21 */
+  PROVIDER          VARCHAR(10),
+  ORIGEM            CHAR(1),
+  TRANSACTION_TYPE  VARCHAR(20),
+  ATK               VARCHAR(60),
+  COBRANCA_ID       VARCHAR(36),
+  ESTORNADO_POR     VARCHAR(36),
+  CONSUMIDO         CHAR(1) DEFAULT 'N',
+  CONSUMIDO_EM      TIMESTAMP,
+  COD_RECEB_CARTOES INTEGER,
+  /* Script23 */
+  REFERENCIA        VARCHAR(60),
+  MANUAL            CHAR(1) DEFAULT 'N',
+  ESTORNADO_EM      TIMESTAMP,
+  CONSTRAINT PK_CIELO_PAGAMENTOS PRIMARY KEY (ID)
+);
+CREATE GENERATOR G_CIELO_PAGAMENTOS;
+CREATE INDEX IDX_CIELO_PAG_VENDA ON CIELO_PAGAMENTOS (ORIGEM, COD_MESA, CONSUMIDO);
+/* Índice único POR EXPRESSÃO: num índice composto (PROVIDER, CIELO_ORDER_ID) o
+   Firebird trataria ('STONE', NULL) como duplicata de ('STONE', NULL). A
+   expressão devolve NULL sem order id — linhas legadas não colidem (nem ficam
+   protegidas; por isso a API nunca grava CIELO_ORDER_ID nulo quando há algo). */
+CREATE UNIQUE INDEX UK_CIELO_PAG_ORDER_EXPR ON CIELO_PAGAMENTOS
+  COMPUTED BY (CASE WHEN CIELO_ORDER_ID IS NULL OR TRIM(CIELO_ORDER_ID) = '' THEN NULL
+                    ELSE COALESCE(PROVIDER, 'CIELO') || '|' || CIELO_ORDER_ID END);
+
+/* ---------------- CIELO_PAGAMENTOS_ITENS (itens cobertos por cada pagamento) ---------- */
+CREATE TABLE CIELO_PAGAMENTOS_ITENS (
+  ID           INTEGER NOT NULL,
+  PAGAMENTO_ID INTEGER NOT NULL,
+  COD_MESA     INTEGER NOT NULL,
+  COD_ITEM     INTEGER NOT NULL,
+  COD_CONJUGA  INTEGER DEFAULT 0,
+  QTDE         NUMERIC(15,3) NOT NULL,
+  VALOR        NUMERIC(15,2) NOT NULL,
+  CONSTRAINT PK_CIELO_PAG_ITENS PRIMARY KEY (ID),
+  CONSTRAINT FK_CIELO_PAG_ITENS_PAG FOREIGN KEY (PAGAMENTO_ID) REFERENCES CIELO_PAGAMENTOS (ID)
+);
+CREATE GENERATOR G_CIELO_PAGAMENTOS_ITENS;
+CREATE INDEX IDX_CIELO_PAG_ITENS_MESA ON CIELO_PAGAMENTOS_ITENS (COD_MESA);
+
+/* ---------------- COBRANCAS_TERMINAL (fila de cobrança; ID = UUID pelo trigger) ------- */
+CREATE TABLE COBRANCAS_TERMINAL (
+  ID                VARCHAR(36) NOT NULL,
+  ORIGEM            CHAR(1) NOT NULL,
+  COD_VENDA         INTEGER NOT NULL,
+  COD_CAIXA         INTEGER,
+  VALOR             NUMERIC(15,2) NOT NULL,
+  TIPO_PRE          VARCHAR(20),
+  PARCELAS_PRE      SMALLINT DEFAULT 1,
+  MODO              CHAR(1) NOT NULL,
+  OPERACAO          CHAR(1) DEFAULT 'P' NOT NULL,
+  ALVO_PAGAMENTO_ID INTEGER,
+  TERMINAL_ID       VARCHAR(40),
+  COD_ENTREGADOR    INTEGER,
+  DESCRICAO         VARCHAR(120),
+  EXTERNAL_REF      VARCHAR(64),
+  STATUS            VARCHAR(20) DEFAULT 'pending' NOT NULL,
+  CANCEL_REQUESTED  CHAR(1) DEFAULT 'N',
+  PROVIDER          VARCHAR(10),
+  PAGAMENTO_ID      INTEGER,
+  MOTIVO_ERRO       VARCHAR(200),
+  CONSUMIDO         CHAR(1) DEFAULT 'N',
+  CONSUMIDO_EM      TIMESTAMP,
+  CONSUMIDO_POR     VARCHAR(20),
+  CRIADO_EM         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  EXPIRA_EM         TIMESTAMP,
+  ATUALIZADO_EM     TIMESTAMP,
+  CANAL             CHAR(1) DEFAULT 'L',      /* 'L' = API/app; 'A' = canal automax-api (a API ignora) */
+  ID_EXTERNO        VARCHAR(40),
+  CONSTRAINT PK_COBRANCAS_TERMINAL PRIMARY KEY (ID)
+);
+ALTER TABLE COBRANCAS_TERMINAL ADD CONSTRAINT FK_COBR_TERM_ALVO
+  FOREIGN KEY (ALVO_PAGAMENTO_ID) REFERENCES CIELO_PAGAMENTOS (ID);
+ALTER TABLE COBRANCAS_TERMINAL ADD CONSTRAINT FK_COBR_TERM_PAGAMENTO
+  FOREIGN KEY (PAGAMENTO_ID) REFERENCES CIELO_PAGAMENTOS (ID);
+CREATE INDEX IDX_COBR_TERM_TERMINAL     ON COBRANCAS_TERMINAL (TERMINAL_ID, STATUS);
+CREATE INDEX IDX_COBR_TERM_ENTREGADOR   ON COBRANCAS_TERMINAL (COD_ENTREGADOR, STATUS);
+CREATE INDEX IDX_COBR_TERM_VENDA        ON COBRANCAS_TERMINAL (ORIGEM, COD_VENDA, STATUS);
+CREATE INDEX IDX_COBR_TERM_ID_EXTERNO   ON COBRANCAS_TERMINAL (ID_EXTERNO);
+CREATE INDEX IDX_COBR_TERM_CANAL_STATUS ON COBRANCAS_TERMINAL (CANAL, STATUS);
+
+CREATE EXCEPTION EX_COBRANCA_INVALIDA 'Cobranca invalida';
+
+SET TERM ^ ;
+CREATE TRIGGER COBRANCAS_TERMINAL_BI0 FOR COBRANCAS_TERMINAL
+ACTIVE BEFORE INSERT POSITION 0 AS
+BEGIN
+  IF (NEW.ID IS NULL OR NEW.ID = '') THEN NEW.ID = UUID_TO_CHAR(GEN_UUID());
+  IF (NEW.STATUS IS NULL) THEN NEW.STATUS = 'pending';
+  IF (NEW.OPERACAO IS NULL) THEN NEW.OPERACAO = 'P';
+  IF (NEW.CANCEL_REQUESTED IS NULL) THEN NEW.CANCEL_REQUESTED = 'N';
+  IF (NEW.CONSUMIDO IS NULL) THEN NEW.CONSUMIDO = 'N';
+  IF (NEW.PARCELAS_PRE IS NULL OR NEW.PARCELAS_PRE < 1) THEN NEW.PARCELAS_PRE = 1;
+  IF (NEW.CRIADO_EM IS NULL) THEN NEW.CRIADO_EM = CURRENT_TIMESTAMP;
+  NEW.ATUALIZADO_EM = CURRENT_TIMESTAMP;
+  /* attended sem terminal ou card de entrega sem entregador = pedido que ninguem vai atender */
+  IF (NEW.MODO = 'A' AND (NEW.TERMINAL_ID IS NULL OR NEW.TERMINAL_ID = '')) THEN
+    EXCEPTION EX_COBRANCA_INVALIDA 'Cobranca attended sem TERMINAL_ID';
+  IF (NEW.MODO = 'D' AND NEW.ORIGEM = 'E' AND NEW.COD_ENTREGADOR IS NULL) THEN
+    EXCEPTION EX_COBRANCA_INVALIDA 'Card de entrega sem COD_ENTREGADOR';
+END^
+
+/* Status final NÃO regride — e sem exceção: o UPDATE é silenciosamente ignorado
+   (protege o PATCH idempotente do app). */
+CREATE TRIGGER COBRANCAS_TERMINAL_BU0 FOR COBRANCAS_TERMINAL
+ACTIVE BEFORE UPDATE POSITION 0 AS
+BEGIN
+  NEW.ATUALIZADO_EM = CURRENT_TIMESTAMP;
+  IF (OLD.STATUS IN ('approved','declined','canceled','expired','error')
+      AND NEW.STATUS IN ('pending','sent_to_terminal')) THEN
+    NEW.STATUS = OLD.STATUS;
+END^
+
+/* Selecionável (SUSPEND). A API usa EXECUTE PROCEDURE, que funciona nas duas formas. */
+CREATE PROCEDURE P_COBRANCAS_EXPIRAR RETURNS (QTDE INTEGER) AS
+BEGIN
+  /* sent_to_terminal NAO expira aqui: a maquineta pode estar com o cliente;
+     quem decide e o desfecho enviado pelo app */
+  UPDATE COBRANCAS_TERMINAL C SET C.STATUS = 'expired'
+   WHERE C.STATUS = 'pending' AND C.EXPIRA_EM IS NOT NULL AND C.EXPIRA_EM < CURRENT_TIMESTAMP;
+  QTDE = ROW_COUNT;
+  SUSPEND;
+END^
+SET TERM ; ^
+
+/* ---------------- VERSAO_SCRIPTS (Script23) — fonte de verdade de "qual script este banco tem" */
+CREATE TABLE VERSAO_SCRIPTS (
+  NUMERO      INTEGER NOT NULL,
+  NOME        VARCHAR(80),
+  APLICADO_EM TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_VERSAO_SCRIPTS PRIMARY KEY (NUMERO)
+);
+INSERT INTO VERSAO_SCRIPTS (NUMERO, NOME) VALUES (21, 'Script21_Cobrancas_Terminal (via Script23)');
+INSERT INTO VERSAO_SCRIPTS (NUMERO, NOME) VALUES (23, 'Script23_Pagamentos_Maquineta');
+COMMIT;

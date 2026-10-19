@@ -7,6 +7,8 @@ var _config = _interopRequireDefault(require("../config"));
 var requests = _interopRequireWildcard(require("../modules/digital/requests/requests.service"));
 var providers = _interopRequireWildcard(require("../modules/digital/providers/providers.service"));
 var _heartbeat = require("../modules/digital/providers/heartbeat.service");
+var _cobrancas = require("../modules/pdv/cobrancas/cobrancas.service");
+var _dbVersion = require("../shared/database/dbVersion");
 function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]); return f; })(e, t); }
 function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 const log = (0, _debug.default)('nodestr:server');
@@ -22,6 +24,17 @@ setInterval(() => {
   requests.getNewRequests(idProvider);
 }, 15000);
 (0, _heartbeat.startWatchdog)();
+
+// Cobranças de maquineta: expira `pending` vencidas (nunca `sent_to_terminal`).
+// Tolerante a erro de conexão (só loga).
+setInterval(() => {
+  (0, _cobrancas.expirarPendentes)();
+}, 30000);
+
+// Autoverificação do schema na subida (o mesmo que GET /health devolve).
+(0, _dbVersion.obterVersaoDb)(true).then(v => {
+  if (v.ok) console.log(`[db] VERSAO_SCRIPTS = ${v.scriptAtual} (mínimo ${v.scriptMinimo}) — ok`);else if (v.scriptAtual == null) console.error(`[db] Banco inacessível na subida: ${v.erro}`);else console.error(`[db] BANCO_DESATUALIZADO: script ${v.scriptAtual} < mínimo ${v.scriptMinimo}. Rode o Script23 antes de usar /pagamentos e /cobrancas.`);
+});
 server.listen(port);
 server.on('error', onError);
 server.on('listening', onListening);

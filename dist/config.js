@@ -24,6 +24,7 @@ const config = {
   twilioWhatsappFrom: process.env.TWILIO_WHATSAPP_FROM || '',
   frontendUrl: process.env.FRONTEND_URL || '',
   firebaseEmail: process.env.FIREBASE_EMAIL || '',
-  firebasePassword: process.env.FIREBASE_PASSWORD || ''
+  firebasePassword: process.env.FIREBASE_PASSWORD || '',
+  apiKey: process.env.API_KEY || ''
 };
 var _default = exports.default = config;
