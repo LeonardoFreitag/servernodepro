@@ -185,6 +185,7 @@ async function resgatarDesfechoTardio(tr, id, row, input, operacao, status) {
 
 /**
  * PATCH /cobrancas/:id — desfecho idempotente, numa única transação.
+ * MODO 'D' (cards): declined/canceled/error devolvem o card a `pending` (nova tentativa).
  * Se o status já é final, devolve o DTO atual sem alterar nada (repetição da
  * fila offline do app nunca é erro).
  */
@@ -230,6 +231,27 @@ async function registrarDesfecho(id, input) {
     }
 
     // declined | canceled | error
+    if (modo === 'D' && s(row.CANCEL_REQUESTED) !== 'S') {
+      // Card (entrega/mesa): não aprovar NÃO encerra a cobrança — o cliente ainda
+      // deve. Volta para `pending`, livre para nova tentativa (inclusive em outro
+      // aparelho), com o motivo da última recusa em MOTIVO_ERRO para o caixa ver.
+      // Só o caixa encerra um card (cancelar / CancelarCardsAbertos). Se o caixa
+      // pediu o cancelamento durante a tentativa (CANCEL_REQUESTED='S'), aí sim
+      // o desfecho vira final, como no modo attended.
+      // O trigger BU0 só bloqueia final → aberto; sent_to_terminal → pending é livre.
+      //
+      // Só reabre se o card está em cobrança POR ESTE aparelho. Um "não aprovado"
+      // que chega atrasado (fila offline do entregador) depois de outro aparelho
+      // já ter pego o card não pode devolvê-lo a pending no meio da cobrança
+      // alheia; nem um repetido sobre um card já pending muda nada além do motivo.
+      const motivoD = motivo ?? `Nao aprovado (${input.status})`;
+      const daqui = status === 'sent_to_terminal' && (!terminalAtual || terminalAtual === input.terminalId);
+      await tr.query(daqui ? `UPDATE COBRANCAS_TERMINAL
+                SET STATUS = 'pending', TERMINAL_ID = NULL, MOTIVO_ERRO = ?,
+                    ATUALIZADO_EM = CURRENT_TIMESTAMP
+              WHERE ID = ?` : `UPDATE COBRANCAS_TERMINAL SET MOTIVO_ERRO = ?, ATUALIZADO_EM = CURRENT_TIMESTAMP WHERE ID = ?`, [motivoD, id]);
+      return;
+    }
     await tr.query(`UPDATE COBRANCAS_TERMINAL
           SET STATUS = ?, PROVIDER = ?, MOTIVO_ERRO = ?,
               TERMINAL_ID = COALESCE(TERMINAL_ID, ?), ATUALIZADO_EM = CURRENT_TIMESTAMP

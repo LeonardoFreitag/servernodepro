@@ -32,6 +32,29 @@ import restauranteRoutes from './modules/digital/restaurante/restaurante.routes'
 const app = express();
 
 app.use(cors());
+// Respostas da API nunca podem ser guardadas por intermediários (proxy da rede do
+// terminal, cache HTTP do Android): o app lê estado vivo (mesas, pagamentos, fila).
+// Caso real (26/10/2026): maquineta recebia /mesas e /pagamentos antigos enquanto
+// o celular, na mesma API, recebia o atual.
+app.use((req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+app.set('etag', false);
+// Log de acesso no console: método, rota, status, origem — para ver se o pedido
+// do aparelho chega mesmo à API (LOG_REQUESTS=false desliga).
+if (process.env.LOG_REQUESTS !== 'false') {
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const inicio = Date.now();
+    res.on('finish', () => {
+      const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
+      console.log(`[http] ${new Date().toISOString()} ${req.method} ${req.originalUrl} -> ${res.statusCode} ${Date.now() - inicio}ms de ${ip.replace('::ffff:', '')}`);
+    });
+    next();
+  });
+}
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'images')));

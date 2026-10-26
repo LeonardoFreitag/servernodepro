@@ -251,6 +251,52 @@ bloco('cards (MODO D)', () => {
     expect(await cob.listarPendentes('CAIXA1')).toHaveLength(1); // só as MODO A pendentes
   });
 
+  it('card recusado volta a pending (sem terminal, com motivo) e aceita nova tentativa', async () => {
+    const card = await inserirCobranca({ ORIGEM: 'E', COD_VENDA: 790, VALOR: 30, MODO: 'D', COD_ENTREGADOR: 3, DESCRICAO: 'Entrega 790' });
+    await cob.claim(card, 'POS-A');
+    const recusado = await cob.registrarDesfecho(card, { terminalId: 'POS-A', provider: 'CIELO', status: 'declined', motivoErro: 'Saldo insuficiente' });
+    expect(recusado).toMatchObject({ status: 'pending', terminalId: null, motivoErro: 'Saldo insuficiente' });
+    expect((await cob.listarCards({ entregador: 3 })).some(c => c.id === card)).toBe(true);
+    // cancelado na maquineta e erro também não encerram
+    await cob.claim(card, 'POS-B');
+    expect((await cob.registrarDesfecho(card, { terminalId: 'POS-B', provider: 'STONE', status: 'canceled' })).status).toBe('pending');
+    await cob.claim(card, 'POS-A');
+    const ok = await cob.registrarDesfecho(card, {
+      terminalId: 'POS-A', provider: 'CIELO', status: 'approved',
+      pagamento: { transactionType: 'CREDIT', installments: 1, amountCents: 3000, providerData: {}, rawResponse: cielo('ORDER-790') },
+    });
+    expect(ok.status).toBe('approved');
+    expect(ok.motivoErro).toBeNull();
+  });
+
+  it('não aprovado atrasado de outro aparelho não reabre card em cobrança alheia', async () => {
+    const card = await inserirCobranca({ ORIGEM: 'M', COD_VENDA: 792, VALOR: 8, MODO: 'D', DESCRICAO: 'Mesa 792' });
+    await cob.claim(card, 'POS-B'); // POS-A cobrou offline e o claim dele ainda não chegou
+    const dto = await cob.registrarDesfecho(card, { terminalId: 'POS-A', provider: 'CIELO', status: 'declined', motivoErro: 'Recusado' });
+    expect(dto).toMatchObject({ status: 'sent_to_terminal', terminalId: 'POS-B', motivoErro: 'Recusado' });
+  });
+
+  it('fila offline do entregador em ordem: claim → recusa → claim → aprovado', async () => {
+    const card = await inserirCobranca({ ORIGEM: 'E', COD_VENDA: 793, VALOR: 22, MODO: 'D', COD_ENTREGADOR: 3, DESCRICAO: 'Entrega 793' });
+    await cob.claim(card, 'POS-E', 3);
+    expect((await cob.registrarDesfecho(card, { terminalId: 'POS-E', provider: 'CIELO', status: 'declined', motivoErro: 'Negada' })).status).toBe('pending');
+    // repetição da fila: só o motivo, continua pending
+    expect((await cob.registrarDesfecho(card, { terminalId: 'POS-E', provider: 'CIELO', status: 'declined', motivoErro: 'Negada' })).status).toBe('pending');
+    await cob.claim(card, 'POS-E', 3);
+    const ok = await cob.registrarDesfecho(card, {
+      terminalId: 'POS-E', provider: 'CIELO', status: 'approved',
+      pagamento: { transactionType: 'DEBIT', installments: 1, amountCents: 2200, providerData: {}, rawResponse: cielo('ORDER-793') },
+    });
+    expect(ok.status).toBe('approved');
+  });
+
+  it('card recusado com cancelamento pedido pelo caixa encerra como no attended', async () => {
+    const card = await inserirCobranca({ ORIGEM: 'M', COD_VENDA: 791, VALOR: 12, MODO: 'D', DESCRICAO: 'Mesa 791' });
+    await cob.claim(card, 'POS-A');
+    expect((await cob.cancelar(card)).httpStatus).toBe(202);
+    expect((await cob.registrarDesfecho(card, { terminalId: 'POS-A', provider: 'CIELO', status: 'declined' })).status).toBe('declined');
+  });
+
   it('trigger BI0 exige COD_ENTREGADOR em MODO D / ORIGEM E', async () => {
     await expect(inserirCobranca({ ORIGEM: 'E', COD_VENDA: 1, VALOR: 1, MODO: 'D' })).rejects.toThrow();
   });

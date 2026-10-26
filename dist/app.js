@@ -37,6 +37,29 @@ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e
 
 const app = (0, _express.default)();
 app.use((0, _cors.default)());
+// Respostas da API nunca podem ser guardadas por intermediários (proxy da rede do
+// terminal, cache HTTP do Android): o app lê estado vivo (mesas, pagamentos, fila).
+// Caso real (26/10/2026): maquineta recebia /mesas e /pagamentos antigos enquanto
+// o celular, na mesma API, recebia o atual.
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+app.set('etag', false);
+// Log de acesso no console: método, rota, status, origem — para ver se o pedido
+// do aparelho chega mesmo à API (LOG_REQUESTS=false desliga).
+if (process.env.LOG_REQUESTS !== 'false') {
+  app.use((req, res, next) => {
+    const inicio = Date.now();
+    res.on('finish', () => {
+      const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
+      console.log(`[http] ${new Date().toISOString()} ${req.method} ${req.originalUrl} -> ${res.statusCode} ${Date.now() - inicio}ms de ${ip.replace('::ffff:', '')}`);
+    });
+    next();
+  });
+}
 app.use(_bodyParser.default.json({
   limit: '50mb'
 }));
